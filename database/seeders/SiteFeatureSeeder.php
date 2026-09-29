@@ -36,8 +36,8 @@ class SiteFeatureSeeder extends Seeder
             ],
             [
                 'icon' => 'shield',
-                'title' => 'Genuine Warranty',
-                'subtitle' => 'Sealed gadgets only',
+                'title' => 'Genuine Products',
+                'subtitle' => '100% authentic items',
                 'sort_order' => 4,
             ],
         ];

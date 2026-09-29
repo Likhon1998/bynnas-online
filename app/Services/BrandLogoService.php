@@ -43,7 +43,7 @@ class BrandLogoService
     }
 
     /**
-     * Store an uploaded brand logo: crop empty padding and fit for the Gadget Lovers strip.
+     * Store an uploaded brand logo: crop empty padding and fit for the storefront brands strip.
      */
     public function storeUploaded(UploadedFile $file): string
     {

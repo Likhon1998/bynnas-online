@@ -6,13 +6,15 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class Product extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'shop_id', 'category_id', 'brand_id', 'name', 'barcode', 'sku',
+        'shop_id', 'category_id', 'brand_id', 'name', 'slug', 'barcode', 'sku',
         'variant_group', 'color', 'color_hex', 'storage', 'ram',
         'requires_imei',
         'cost_price', 'selling_price', 'original_price',
@@ -20,9 +22,48 @@ class Product extends Model
         'pos_discount_type', 'pos_discount_value',
         'stock_quantity', 'reserved_stock', 'availability', 'filter_attributes', 'alert_quantity', 'reorder_quantity',
         'image', 'image_2', 'image_3',
-        'short_description', 'brand_name', 'rating', 'review_count',
+        'short_description', 'description', 'brand_name', 'rating', 'review_count',
+        'seo_title', 'meta_description', 'og_title', 'og_description', 'og_image',
         'is_best_seller', 'is_featured', 'is_new_arrival', 'is_published',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (Product $product) {
+            if (blank($product->getAttributes()['slug'] ?? null) && filled($product->name)) {
+                $product->slug = static::uniqueSlug((int) $product->shop_id, (string) $product->name, $product->id);
+            }
+        });
+    }
+
+    public function getSlugAttribute(?string $value): string
+    {
+        return filled($value) ? $value : (string) $this->getKey();
+    }
+
+    public static function uniqueSlug(int $shopId, string $name, ?int $ignoreId = null): string
+    {
+        $base = Str::slug($name) ?: 'product';
+        $slug = $base;
+        $n = 2;
+        while (static::where('shop_id', $shopId)->where('slug', $slug)
+            ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))->exists()) {
+            $slug = $base.'-'.$n++;
+        }
+
+        return $slug;
+    }
+
+    /** Storefront links use the slug; numeric IDs keep old links and admin routes working. */
+    public function resolveRouteBinding($value, $field = null)
+    {
+        if ($field === 'slug') {
+            return static::where('slug', $value)->first()
+                ?? (ctype_digit((string) $value) ? static::find((int) $value) : null);
+        }
+
+        return parent::resolveRouteBinding($value, $field);
+    }
 
     protected $casts = [
         'cost_price' => 'decimal:2',
@@ -91,6 +132,77 @@ class Product extends Model
     public function galleryImages()
     {
         return $this->hasMany(ProductImage::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    public function variantValues()
+    {
+        return $this->hasMany(ProductVariantValue::class);
+    }
+
+    /**
+     * Attribute values for this row, ordered like the attribute list (falls back to legacy columns).
+     *
+     * @return Collection<int, array{attribute_id: int|null, slug: string, attribute: string, type: string, value: string, value_slug: string, hex: string|null}>
+     */
+    public function variantOptions(): Collection
+    {
+        $rows = $this->relationLoaded('variantValues')
+            ? $this->variantValues
+            : $this->variantValues()->with(['attribute', 'attributeValue'])->get();
+        $rows->loadMissing(['attribute', 'attributeValue']);
+
+        $options = $rows
+            ->filter(fn (ProductVariantValue $v) => $v->attribute && $v->attributeValue)
+            ->sortBy(fn (ProductVariantValue $v) => [$v->attribute->sort_order, $v->attribute->name])
+            ->map(fn (ProductVariantValue $v) => [
+                'attribute_id' => (int) $v->attribute->id,
+                'slug' => (string) $v->attribute->slug,
+                'attribute' => (string) $v->attribute->name,
+                'type' => (string) $v->attribute->type,
+                'value' => (string) $v->attributeValue->value,
+                'value_slug' => (string) $v->attributeValue->slug,
+                'hex' => $v->attribute->isColor() ? $v->attributeValue->swatchHex() : null,
+            ])
+            ->values();
+
+        if ($options->isNotEmpty()) {
+            return $options;
+        }
+
+        $legacy = collect();
+        foreach (['color' => 'Color', 'storage' => 'Storage', 'ram' => 'RAM'] as $column => $label) {
+            if (filled($this->{$column})) {
+                $legacy->push([
+                    'attribute_id' => null,
+                    'slug' => $column,
+                    'attribute' => $label,
+                    'type' => $column === 'color' ? ProductAttribute::TYPE_COLOR : ProductAttribute::TYPE_SELECT,
+                    'value' => (string) $this->{$column},
+                    'value_slug' => Str::slug((string) $this->{$column}),
+                    'hex' => $column === 'color' ? $this->swatchHex() : null,
+                ]);
+            }
+        }
+
+        return $legacy;
+    }
+
+    /** "Red / XL" style label of the variant options. */
+    public function variantLabel(): string
+    {
+        return $this->variantOptions()->pluck('value')->implode(' / ');
+    }
+
+    public function seoTitle(): string
+    {
+        return (string) ($this->seo_title ?: $this->storefrontDisplayName());
+    }
+
+    public function seoDescription(): string
+    {
+        $text = $this->meta_description ?: ($this->short_description ?: strip_tags((string) $this->description));
+
+        return Str::limit(trim(preg_replace('/\s+/', ' ', (string) $text) ?? ''), 160, '…');
     }
 
     public function imeis()
@@ -336,24 +448,6 @@ class Product extends Model
         ])->save();
     }
 
-    /** Sibling products in the same variant group (other colors / storage). */
-    public function variantSiblings()
-    {
-        if (!$this->variant_group) {
-            return collect();
-        }
-
-        return static::query()
-            ->where('shop_id', $this->shop_id)
-            ->where('variant_group', $this->variant_group)
-            ->where('id', '!=', $this->id)
-            ->where(function ($q) {
-                $q->where('is_published', true)->orWhereNull('is_published');
-            })
-            ->availableForSale()
-            ->get();
-    }
-
     /** Model name without trailing "— Green / 8GB" style suffixes used for admin clarity. */
     public function storefrontDisplayName(): string
     {
@@ -361,7 +455,8 @@ class Product extends Model
             return (string) $this->name;
         }
 
-        $name = trim(preg_replace('/\s*[—\-–].*$/u', '', (string) $this->name) ?? '');
+        // Suffix separator needs surrounding spaces so names like "T-Shirt" stay intact.
+        $name = trim(preg_replace('/\s+[—\-–]\s+.*$/u', '', (string) $this->name) ?? '');
 
         return $name !== '' ? $name : (string) $this->name;
     }
@@ -386,22 +481,8 @@ class Product extends Model
             $lines[] = ['label' => 'Brand', 'value' => $brand];
         }
 
-        if (filled($this->color)) {
-            $lines[] = ['label' => 'Color', 'value' => (string) $this->color];
-        }
-
-        $ram = normalize_memory_size($this->ram) ?? (filled($this->ram) ? (string) $this->ram : null);
-        $storage = normalize_memory_size($this->storage) ?? (filled($this->storage) ? (string) $this->storage : null);
-
-        if ($ram && $storage) {
-            $lines[] = ['label' => 'Memory', 'value' => $ram.'/'.$storage];
-        } else {
-            if ($ram) {
-                $lines[] = ['label' => 'RAM', 'value' => $ram];
-            }
-            if ($storage) {
-                $lines[] = ['label' => 'Storage', 'value' => $storage];
-            }
+        foreach ($this->variantOptions() as $option) {
+            $lines[] = ['label' => $option['attribute'], 'value' => $option['value']];
         }
 
         if (filled($this->barcode)) {
@@ -413,40 +494,12 @@ class Product extends Model
         return $lines;
     }
 
-    public function displayColor(): ?string
-    {
-        return $this->color ?: null;
-    }
-
     public function swatchHex(): string
     {
         if ($this->color_hex && preg_match('/^#[0-9A-Fa-f]{6}$/', $this->color_hex)) {
             return $this->color_hex;
         }
 
-        $map = [
-            'red' => '#dc2626',
-            'blue' => '#2563eb',
-            'black' => '#1e293b',
-            'white' => '#f8fafc',
-            'green' => '#16a34a',
-            'gold' => '#ca8a04',
-            'silver' => '#94a3b8',
-            'gray' => '#64748b',
-            'grey' => '#64748b',
-            'pink' => '#ec4899',
-            'purple' => '#9333ea',
-            'orange' => '#ea580c',
-            'yellow' => '#eab308',
-            'natural titanium' => '#d4cfc8',
-            'phantom black' => '#2d2d2d',
-            'white titanium' => '#e8e6e3',
-            'blue titanium' => '#5b7a9d',
-            'black titanium' => '#3a3a3a',
-        ];
-
-        $key = strtolower(trim($this->color ?? ''));
-
-        return $map[$key] ?? '#cbd5e1';
+        return color_name_to_hex($this->color);
     }
 }

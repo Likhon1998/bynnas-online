@@ -3,15 +3,14 @@
     $images = $ws->productImageUrls($product);
     $img = $images[0];
     $reviews = $reviews ?? collect();
-        $variantOptions = $variantOptions ?? ['colors' => [], 'combos' => [], 'storages' => [], 'rams' => []];
-        $discountPct = $product->discountPercent();
-        $currentPrice = $product->currentPrice();
-        $compareAt = $product->compareAtPrice();
+    $variantOptions = $variantOptions ?? ['groups' => [], 'specs' => []];
+    $variantGroups = $variantOptions['groups'] ?? [];
+    $variantSpecs = $variantOptions['specs'] ?? [];
+    $discountPct = $product->discountPercent();
+    $currentPrice = $product->currentPrice();
+    $compareAt = $product->compareAtPrice();
     $displayName = $product->storefrontDisplayName();
-    $hasVariantPicker = count($variantOptions['colors'] ?? []) > 0
-        || count($variantOptions['combos'] ?? []) > 0
-        || count($variantOptions['storages'] ?? []) > 0
-        || count($variantOptions['rams'] ?? []) > 0;
+    $longDescription = $product->description ?: $product->short_description;
 @endphp
 
 {{-- Breadcrumbs --}}
@@ -155,111 +154,43 @@
             </div>
         </div>
 
-        @if($hasVariantPicker)
-            @php
-                $hasColors = count($variantOptions['colors'] ?? []) > 0;
-                $hasCombos = count($variantOptions['combos'] ?? []) > 0;
-                $hasStorages = count($variantOptions['storages'] ?? []) > 0;
-                $hasRams = count($variantOptions['rams'] ?? []) > 0;
-                $storageBesideColor = $hasColors && ($hasCombos || $hasStorages);
-            @endphp
-            <div class="pd-variants {{ $storageBesideColor ? 'pd-variants--split' : '' }}">
-                @if($hasColors)
-                    <div class="pd-variant-block">
-                        <p class="pd-variant-label">Color</p>
+        @if(count($variantGroups) > 0)
+            <div class="pd-variants">
+                @foreach($variantGroups as $group)
+                    @php $isColorGroup = $group['type'] === 'color'; @endphp
+                    <div class="pd-variant-block pd-variant-block--full">
+                        <p class="pd-variant-label">{{ $group['attribute'] }}</p>
                         <div class="pd-option-row">
-                            @foreach($variantOptions['colors'] as $opt)
+                            @foreach($group['options'] as $opt)
                                 <a href="{{ $opt['url'] }}"
                                    data-product-variant
                                    data-no-loader
                                    title="{{ $opt['label'] }}{{ empty($opt['available']) ? ' (out of stock)' : '' }}"
-                                   class="pd-option {{ !empty($opt['active']) ? 'is-active' : '' }} {{ empty($opt['available']) ? 'is-disabled' : '' }}">
-                                    @if(!empty($opt['image']))
-                                        <img src="{{ $opt['image'] }}" alt="" class="pd-color-thumb">
+                                   class="pd-option {{ $isColorGroup ? '' : 'pd-option--storage' }} {{ !empty($opt['active']) ? 'is-active' : '' }} {{ empty($opt['available']) ? 'is-disabled' : '' }}">
+                                    @if($isColorGroup)
+                                        @if(!empty($opt['image']))
+                                            <img src="{{ $opt['image'] }}" alt="" class="pd-color-thumb">
+                                        @else
+                                            <span class="pd-swatch" style="background-color: {{ $opt['hex'] }}"></span>
+                                        @endif
+                                        <span>{{ $opt['label'] }}</span>
                                     @else
-                                        <span class="pd-swatch" style="background-color: {{ $opt['hex'] }}"></span>
-                                    @endif
-                                    <span>{{ $opt['label'] }}</span>
-                                </a>
-                            @endforeach
-                        </div>
-                    </div>
-                @elseif($product->color)
-                    <p class="pd-meta-line">Color: <strong>{{ $product->color }}</strong></p>
-                @endif
-
-                @if($hasCombos)
-                    <div class="pd-variant-block">
-                        <p class="pd-variant-label">Storage</p>
-                        <div class="pd-option-row">
-                            @foreach($variantOptions['combos'] as $opt)
-                                <a href="{{ $opt['url'] }}"
-                                   data-product-variant
-                                   data-no-loader
-                                   class="pd-option pd-option--storage {{ !empty($opt['active']) ? 'is-active' : '' }} {{ empty($opt['available']) ? 'is-disabled' : '' }}">
-                                    <span class="pd-option-main">{{ $opt['label'] }}</span>
-                                    @if(isset($opt['price']) && empty($opt['active']))
-                                        <span class="pd-option-sub">{{ $ws->formatPrice($opt['price'], $settings) }}</span>
+                                        <span class="pd-option-main">{{ $opt['label'] }}</span>
                                     @endif
                                 </a>
                             @endforeach
                         </div>
                     </div>
-                @elseif($hasStorages || $product->storage)
-                    <div class="pd-variant-block">
-                        <p class="pd-variant-label">Storage</p>
-                        @if($hasStorages)
-                            <div class="pd-option-row">
-                                @foreach($variantOptions['storages'] as $opt)
-                                    <a href="{{ $opt['url'] }}"
-                                       data-product-variant
-                                       data-no-loader
-                                       class="pd-option pd-option--storage {{ !empty($opt['active']) ? 'is-active' : '' }} {{ empty($opt['available']) ? 'is-disabled' : '' }}">
-                                        {{ $opt['label'] }}
-                                    </a>
-                                @endforeach
-                            </div>
-                        @else
-                            <p class="pd-meta-line"><strong>{{ normalize_memory_size($product->storage) ?? $product->storage }}</strong></p>
-                        @endif
-                    </div>
-                @endif
-
-                @if($hasRams)
-                    <div class="pd-variant-block pd-variant-block--full">
-                        <p class="pd-variant-label">RAM</p>
-                        <div class="pd-option-row">
-                            @foreach($variantOptions['rams'] as $opt)
-                                <a href="{{ $opt['url'] }}"
-                                   data-product-variant
-                                   data-no-loader
-                                   class="pd-option pd-option--storage {{ !empty($opt['active']) ? 'is-active' : '' }} {{ empty($opt['available']) ? 'is-disabled' : '' }}">
-                                    {{ $opt['label'] }}
-                                </a>
-                            @endforeach
-                        </div>
-                    </div>
-                @elseif($product->ram && ! $hasCombos)
-                    <div class="pd-variant-block pd-variant-block--full">
-                        <p class="pd-variant-label">RAM</p>
-                        <p class="pd-meta-line"><strong>{{ normalize_memory_size($product->ram) ?? $product->ram }}</strong></p>
-                    </div>
-                @endif
+                @endforeach
             </div>
-        @else
-            @if($product->color || $product->storage || $product->ram)
-                <div class="pd-meta-lines">
-                    @if($product->color)
-                        <p class="pd-meta-line">Color: <strong>{{ $product->color }}</strong></p>
-                    @endif
-                    @if($product->storage)
-                        <p class="pd-meta-line">Storage: <strong>{{ normalize_memory_size($product->storage) ?? $product->storage }}</strong></p>
-                    @endif
-                    @if($product->ram)
-                        <p class="pd-meta-line">RAM: <strong>{{ normalize_memory_size($product->ram) ?? $product->ram }}</strong></p>
-                    @endif
-                </div>
-            @endif
+        @endif
+
+        @if(count($variantSpecs) > 0)
+            <div class="pd-meta-lines">
+                @foreach($variantSpecs as $spec)
+                    <p class="pd-meta-line">{{ $spec['label'] }}: <strong>{{ $spec['value'] }}</strong></p>
+                @endforeach
+            </div>
         @endif
 
         @php
@@ -277,7 +208,7 @@
                 'price' => $currentPrice,
                 'image' => $img,
                 'url' => route('website.product', $product),
-                'category' => $product->category?->name ?? $product->brand_name ?? 'Electronics',
+                'category' => $product->category?->name ?? $product->brand_name ?? 'Products',
                 'rating' => (float) ($product->rating ?? 0),
                 'stock' => $availableQty,
             ];
@@ -302,7 +233,7 @@
                             data-checkout="1"
                             class="pd-btn-primary">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                        Shop Now
+                        Buy Now
                     </button>
                 </div>
                 <div class="pd-cta-bottom">
@@ -326,7 +257,7 @@
                     </button>
                 </div>
             @else
-                <p class="pd-oos">This variant is currently out of stock. Try another color or storage.</p>
+                <p class="pd-oos">This option is currently out of stock. Try another option or save it for later.</p>
                 <button type="button"
                         class="pd-btn-wish pd-btn-wish--wide"
                         :class="inWishlist({{ $product->id }}) && 'is-active'"
@@ -343,9 +274,9 @@
         <div class="pd-trust">
             @foreach([
                 ['Fast Delivery', 'COD available'],
-                ['30-Day Returns', 'Easy returns'],
-                ['1 Year Warranty', 'Manufacturer'],
-                ['Secure Checkout', 'Sign in · COD'],
+                ['Easy Returns', 'Hassle-free'],
+                ['Genuine Products', '100% authentic'],
+                ['Secure Checkout', 'Guest or sign in'],
             ] as [$title, $sub])
                 <div class="pd-trust-item">
                     <svg class="w-3.5 h-3.5 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -360,12 +291,12 @@
 </div>
 
 {{-- Tabs + related in one denser lower section --}}
-@if($product->short_description || $reviews->isNotEmpty() || $related->count())
+@if($longDescription || $reviews->isNotEmpty() || $related->count())
 <section class="pd-lower mt-6 pt-5 border-t border-slate-100">
-    @if($product->short_description || $reviews->isNotEmpty())
+    @if($longDescription || $reviews->isNotEmpty())
         <div class="pd-tabs" x-data="{ tab: 'description' }">
             <div class="flex gap-5 border-b border-slate-100 mb-4">
-                @if($product->short_description)
+                @if($longDescription)
                     <button type="button" @click="tab='description'"
                             :class="tab==='description' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500'"
                             class="pb-2 text-sm font-medium border-b-2 transition">Description</button>
@@ -377,10 +308,10 @@
                 @endif
             </div>
 
-            @if($product->short_description)
+            @if($longDescription)
                 <div x-show="tab==='description'">
                     <h3 class="text-sm font-semibold text-slate-900 mb-1.5">About this item</h3>
-                    <div class="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{{ $product->short_description }}</div>
+                    <div class="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{{ $longDescription }}</div>
                 </div>
             @endif
 
@@ -399,7 +330,7 @@
     @endif
 
     @if($related->count())
-        <div class="pd-related {{ ($product->short_description || $reviews->isNotEmpty()) ? 'mt-6 pt-5 border-t border-slate-100' : '' }}">
+        <div class="pd-related {{ ($longDescription || $reviews->isNotEmpty()) ? 'mt-6 pt-5 border-t border-slate-100' : '' }}">
             <h2 class="text-sm font-semibold text-slate-900 mb-3">You may also like</h2>
             <div class="pd-related-grid">
                 @foreach($related->take(4) as $rel)

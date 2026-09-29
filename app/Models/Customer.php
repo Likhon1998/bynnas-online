@@ -89,7 +89,9 @@ class Customer extends Model
     public static function normalizePhone(?string $phone): string
     {
         $raw = trim((string) $phone);
+        $digits = preg_replace('/\D+/', '', $raw) ?: $raw;
 
-        return preg_replace('/\D+/', '', $raw) ?: $raw;
+        // +8801711000000 / 8801711000000 → 01711000000
+        return str_starts_with($digits, '880') && strlen($digits) === 13 ? substr($digits, 2) : $digits;
     }
 }

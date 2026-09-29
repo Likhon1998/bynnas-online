@@ -97,17 +97,69 @@
                     <dl class="mt-3 space-y-2 text-[13px]">
                         <div>
                             <dt class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Name</dt>
-                            <dd class="font-semibold text-slate-900">{{ $order->customer->name ?? 'Guest' }}</dd>
+                            <dd class="font-semibold text-slate-900">{{ $order->delivery_name ?: ($order->customer->name ?? 'Guest') }}</dd>
                         </div>
                         <div>
                             <dt class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Phone</dt>
-                            <dd class="font-medium text-slate-700">{{ $order->customer->phone ?? 'N/A' }}</dd>
+                            <dd class="font-medium text-slate-700">{{ $order->delivery_phone ?: ($order->customer->phone ?? 'N/A') }}</dd>
                         </div>
                         <div>
                             <dt class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Address</dt>
-                            <dd class="text-slate-600 leading-relaxed">{{ $order->customer->address ?? 'No address' }}</dd>
+                            <dd class="text-slate-600 leading-relaxed">{{ $order->delivery_address ?: ($order->customer->address ?? 'No address') }}</dd>
                         </div>
+                        @if($order->customer_note)
+                            <div>
+                                <dt class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Customer note</dt>
+                                <dd class="rounded-lg bg-amber-50 px-2 py-1 text-slate-700">{{ $order->customer_note }}</dd>
+                            </div>
+                        @endif
                     </dl>
+
+                    <div class="mt-4 border-t border-slate-100 pt-3">
+                        <h4 class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Order source</h4>
+                        @if($order->landingPage)
+                            <p class="mt-2 text-[12px] text-slate-500">Ordered from landing page
+                                @can('manage campaigns')
+                                    <a href="{{ route('landing-pages.edit', $order->landingPage) }}" class="font-semibold text-indigo-600 hover:underline">{{ $order->landingPage->title }}</a>
+                                @else
+                                    <span class="font-semibold text-slate-800">{{ $order->landingPage->title }}</span>
+                                @endcan
+                            </p>
+                        @endif
+                        @if($order->utm_source || $order->campaign_id)
+                            <dl class="mt-2 space-y-1 text-[12px]">
+                                @if($order->campaign)
+                                    <div class="flex justify-between gap-3">
+                                        <dt class="text-slate-500">Campaign</dt>
+                                        <dd class="text-right">
+                                            @can('manage campaigns')
+                                                <a href="{{ route('campaigns.show', $order->campaign) }}" class="font-semibold text-indigo-600 hover:underline">{{ $order->campaign->name }}</a>
+                                            @else
+                                                <span class="font-semibold text-slate-800">{{ $order->campaign->name }}</span>
+                                            @endcan
+                                        </dd>
+                                    </div>
+                                @endif
+                                @foreach([
+                                    'Platform' => $order->utm_source ? (\App\Models\Campaign::SOURCES[$order->utm_source] ?? \Illuminate\Support\Str::headline($order->utm_source)) : null,
+                                    'Type' => $order->utm_medium ? (\App\Models\Campaign::MEDIUMS[$order->utm_medium] ?? \Illuminate\Support\Str::headline($order->utm_medium)) : null,
+                                    'Campaign tag' => $order->campaign_id ? null : $order->utm_campaign,
+                                    'Placement' => $order->utm_content,
+                                    'Landing page' => $order->landing_page,
+                                    'Referrer' => $order->referrer_host,
+                                ] as $label => $value)
+                                    @if($value)
+                                        <div class="flex justify-between gap-3">
+                                            <dt class="text-slate-500">{{ $label }}</dt>
+                                            <dd class="min-w-0 truncate text-right font-medium text-slate-700" title="{{ $value }}">{{ $value }}</dd>
+                                        </div>
+                                    @endif
+                                @endforeach
+                            </dl>
+                        @else
+                            <p class="mt-1 text-[12px] text-slate-500">Direct / unknown</p>
+                        @endif
+                    </div>
                 </div>
 
                 <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

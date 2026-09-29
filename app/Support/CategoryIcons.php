@@ -13,6 +13,42 @@ class CategoryIcons
     public static function catalog(): array
     {
         return [
+            'shirt' => [
+                'label' => 'Fashion',
+                'keywords' => ['fashion', 'clothing', 'clothes', 'apparel', 'shirt', 't-shirt', 'dress', 'kurti', 'saree', 'jeans', 'wear'],
+                'color' => '#be185d',
+                'bg' => '#fce7f3',
+            ],
+            'sparkles' => [
+                'label' => 'Beauty',
+                'keywords' => ['beauty', 'cosmetic', 'cosmetics', 'makeup', 'skincare', 'skin care', 'lipstick', 'perfume'],
+                'color' => '#c026d3',
+                'bg' => '#fae8ff',
+            ],
+            'toy' => [
+                'label' => 'Toys',
+                'keywords' => ['toy', 'toys', 'kids', 'puzzle', 'lego', 'play'],
+                'color' => '#ea580c',
+                'bg' => '#ffedd5',
+            ],
+            'baby' => [
+                'label' => 'Baby',
+                'keywords' => ['baby', 'infant', 'newborn', 'toddler', 'diaper', 'maternity'],
+                'color' => '#0891b2',
+                'bg' => '#cffafe',
+            ],
+            'home' => [
+                'label' => 'Home',
+                'keywords' => ['home', 'kitchen', 'decor', 'furniture', 'bedding', 'cookware', 'household', 'living'],
+                'color' => '#16a34a',
+                'bg' => '#dcfce7',
+            ],
+            'bag' => [
+                'label' => 'Bags',
+                'keywords' => ['bag', 'bags', 'handbag', 'backpack', 'wallet', 'purse', 'luggage'],
+                'color' => '#b45309',
+                'bg' => '#fef3c7',
+            ],
             'phone' => [
                 'label' => 'Phone',
                 'keywords' => ['phone', 'smartphone', 'mobile', 'iphone', 'android', 'cell'],

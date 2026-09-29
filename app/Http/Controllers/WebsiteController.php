@@ -6,25 +6,22 @@ use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Order;
-use App\Models\OrderItem;
 use App\Models\Product;
-use App\Services\AccountService;
-use App\Services\DeliveryChargeService;
+use App\Services\CampaignAttributionService;
 use App\Services\OnlineOrderTrackingService;
-use App\Services\StockService;
+use App\Services\OrderCreationException;
+use App\Services\OrderCreationService;
 use App\Services\WebsiteService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class WebsiteController extends Controller
 {
     public function __construct(
         private WebsiteService $website,
-        private AccountService $accounts,
-        private StockService $stock,
         private OnlineOrderTrackingService $tracking,
-        private DeliveryChargeService $delivery,
+        private OrderCreationService $orders,
+        private CampaignAttributionService $attribution,
     ) {}
 
     public function home()
@@ -69,31 +66,7 @@ class WebsiteController extends Controller
             $query->where('selling_price', '<=', (float) $request->max_price);
         }
 
-        $storages = array_values(array_filter(array_map('strval', (array) $request->input('storage', []))));
-        if ($storages !== []) {
-            $query->where(function ($q) use ($storages) {
-                foreach ($storages as $value) {
-                    $compact = memory_size_compact($value);
-                    if ($compact === '') {
-                        continue;
-                    }
-                    $q->orWhereRaw("LOWER(REPLACE(COALESCE(storage, ''), ' ', '')) = ?", [$compact]);
-                }
-            });
-        }
-
-        $rams = array_values(array_filter(array_map('strval', (array) $request->input('ram', []))));
-        if ($rams !== []) {
-            $query->where(function ($q) use ($rams) {
-                foreach ($rams as $value) {
-                    $compact = memory_size_compact($value);
-                    if ($compact === '') {
-                        continue;
-                    }
-                    $q->orWhereRaw("LOWER(REPLACE(COALESCE(ram, ''), ' ', '')) = ?", [$compact]);
-                }
-            });
-        }
+        $this->website->applyAttributeFilters($query, $shopId, $this->website->selectedAttributeFilters($request));
 
         if ($request->filter === 'deals') {
             $query->onSale();
@@ -311,27 +284,10 @@ class WebsiteController extends Controller
             ->filter(fn (Brand $b) => (int) ($b->products_count ?? $b->published_count ?? 0) > 0)
             ->values();
 
-        $storageOptions = unique_memory_sizes(
-            (clone $catalog)
-                ->whereNotNull('storage')
-                ->where('storage', '!=', '')
-                ->distinct()
-                ->pluck('storage')
-        );
-
-        $ramOptions = unique_memory_sizes(
-            (clone $catalog)
-                ->whereNotNull('ram')
-                ->where('ram', '!=', '')
-                ->distinct()
-                ->pluck('ram')
-        );
-
         return [
             'categories' => $categories,
             'brands' => $brands,
-            'storageOptions' => $storageOptions,
-            'ramOptions' => $ramOptions,
+            'attributeFacets' => $this->website->attributeFacets($shopId, $catalog),
             'categoryTotal' => (clone $catalog)->count(),
             'priceBounds' => [
                 'min' => 0,
@@ -407,40 +363,13 @@ class WebsiteController extends Controller
                 continue;
             }
 
-            if ($type === 'storage') {
-                $query->where(function ($q) use ($selected) {
-                    foreach ($selected as $value) {
-                        $compact = memory_size_compact(str_replace('_', ' ', (string) $value));
-                        if ($compact === '') {
-                            continue;
-                        }
-                        $q->orWhereRaw("LOWER(REPLACE(COALESCE(storage, ''), ' ', '')) = ?", [$compact]);
-                    }
-                });
-                continue;
-            }
-
-            if ($type === 'ram') {
-                $query->where(function ($q) use ($selected) {
-                    foreach ($selected as $value) {
-                        $compact = memory_size_compact(str_replace('_', ' ', (string) $value));
-                        if ($compact === '') {
-                            continue;
-                        }
-                        $q->orWhereRaw("LOWER(REPLACE(COALESCE(ram, ''), ' ', '')) = ?", [$compact]);
-                    }
-                });
-                continue;
-            }
-
-            if ($type === 'color') {
-                $query->where(function ($q) use ($selected) {
-                    foreach ($selected as $value) {
-                        $label = str_replace('_', ' ', $value);
-                        $q->orWhereRaw('LOWER(REPLACE(COALESCE(color, \'\'), \' \', \'_\')) = ?', [strtolower($value)])
-                            ->orWhereRaw('LOWER(color) = ?', [strtolower($label)]);
-                    }
-                });
+            if ($type === 'attribute') {
+                $isMemory = in_array($key, ['storage', 'ram'], true);
+                $this->website->applyAttributeFilters($query, (int) $category->shop_id, [
+                    $key => collect($selected)
+                        ->map(fn ($v) => \Illuminate\Support\Str::slug($isMemory ? memory_size_compact(str_replace('_', ' ', (string) $v)) : (string) $v))
+                        ->filter()->values()->all(),
+                ]);
                 continue;
             }
 
@@ -465,7 +394,13 @@ class WebsiteController extends Controller
             $type = $group['type'] ?? 'custom';
             $options = $group['options'] ?? [];
 
-            if (in_array($type, ['brand', 'storage', 'ram', 'color', 'custom'], true) && $options === []) {
+            if ($type === 'attribute') {
+                $categoryProducts = Product::query()
+                    ->where('shop_id', $category->shop_id)
+                    ->where('category_id', $category->id)
+                    ->where(fn ($q) => $q->where('is_published', true)->orWhereNull('is_published'));
+                $options = $this->website->attributeFacets((int) $category->shop_id, $categoryProducts, [$group['key'] ?? ''])[0]['options'] ?? [];
+            } elseif (in_array($type, ['brand', 'custom'], true) && $options === []) {
                 $options = \App\Support\CategoryFilterConfig::facetValues($category, $type, $group['key'] ?? '')
                     ->all();
             }
@@ -720,7 +655,12 @@ class WebsiteController extends Controller
             ->with(['customer', 'items.product', 'statusLogs'])
             ->first();
 
-        if (! $order || ! $order->customer || Customer::normalizePhone($order->customer->phone) !== $phone) {
+        $phoneMatches = $order && in_array($phone, array_filter([
+            Customer::normalizePhone($order->customer?->phone),
+            $order->delivery_phone ? Customer::normalizePhone($order->delivery_phone) : null,
+        ]), true);
+
+        if (! $order || ! $phoneMatches) {
             return back()
                 ->withInput()
                 ->with('error', 'No order found for that Order ID and phone number.');
@@ -835,149 +775,35 @@ class WebsiteController extends Controller
             'customer_address.required' => 'Delivery address is required to place your order.',
         ]);
 
-        $deliveryAddress = trim(preg_replace('/\s+/u', ' ', (string) $request->customer_address) ?? '');
-        $request->merge(['customer_address' => $deliveryAddress]);
-
-        $customer = Customer::where('shop_id', $shopId)
-            ->where('user_id', $user->id)
-            ->first();
-
-        if (! $customer) {
-            $customer = Customer::create([
-                'shop_id' => $shopId,
-                'user_id' => $user->id,
-                'name' => $request->customer_name,
-                'email' => $user->email,
-                'phone' => $request->customer_phone,
-                'address' => $request->customer_address,
-            ]);
-        } else {
-            $customer->update([
-                'name' => $request->customer_name,
-                'phone' => $request->customer_phone,
-                'address' => $request->customer_address,
-                'email' => $user->email,
-            ]);
-        }
-
-        $user->update(['name' => $request->customer_name]);
-
-        $shopAdmin = \App\Models\User::where('shop_id', $shopId)->whereIn('role', ['admin', 'shop_owner', 'Shop Owner'])->first();
-        $fallbackUserId = $shopAdmin?->id ?? $user->id;
-
-        // Resolve cart against live catalog prices/stock (never trust client prices).
-        $resolvedLines = [];
-        $subtotal = 0.0;
-
-        foreach ((array) $request->cart as $item) {
-            $productId = (int) ($item['id'] ?? 0);
-            $qty = (int) ($item['qty'] ?? 0);
-            if ($productId < 1 || $qty < 1) {
-                return response()->json(['success' => false, 'message' => 'Invalid cart item.']);
-            }
-
-            $product = Product::where('shop_id', $shopId)->find($productId);
-            if (! $product || $product->is_published === false) {
-                return response()->json(['success' => false, 'message' => 'A product in your cart is no longer available.']);
-            }
-            if ($product->availableStock() < $qty) {
-                return response()->json([
-                    'success' => false,
-                    'message' => "Not enough stock for {$product->name}. Only {$product->availableStock()} left.",
-                ]);
-            }
-
-            $unitPrice = $product->currentPrice();
-            $lineTotal = $unitPrice * $qty;
-            $subtotal += $lineTotal;
-
-            $resolvedLines[] = [
-                'product' => $product,
-                'qty' => $qty,
-                'unit_price' => $unitPrice,
-                'subtotal' => $lineTotal,
-            ];
-        }
-
-        if ($resolvedLines === []) {
-            return response()->json(['success' => false, 'message' => 'Cart is empty or store unavailable.']);
-        }
-
-        $quote = $this->delivery->quote(
-            $subtotal,
-            $request->input('delivery_zone'),
-            $request->input('payment_method'),
-        );
-
-        $deliveryFee = $quote['delivery_fee'];
-        $finalTotal = $quote['grand_total'];
-        $paidNow = $quote['amount_paid_now'];
-        $confirmationCharge = $quote['confirmation_amount'];
-        $paymentMethod = $quote['payment_method'];
-
         try {
-            DB::beginTransaction();
-
-            $invoiceNo = Order::nextWebInvoiceNo($shopId);
-            if ($invoiceNo === '') {
-                throw new \RuntimeException('Could not generate an order ID. Please try again.');
-            }
-
-            $order = Order::create([
-                'shop_id' => $shopId,
-                'user_id' => $fallbackUserId,
-                'invoice_no' => $invoiceNo,
-                'customer_id' => $customer->id,
-                'total_amount' => $finalTotal,
-                'delivery_charge' => $deliveryFee,
-                'delivery_zone' => $quote['zone'],
-                'confirmation_charge' => $confirmationCharge,
-                'paid_amount' => $paidNow,
-                'payment_method' => $paymentMethod,
-                'status' => 'pending_fulfillment',
-                'counter_id' => null,
+            $result = $this->orders->place($shopId, [
+                'name' => $request->customer_name,
+                'phone' => $request->customer_phone,
+                'address' => $request->customer_address,
+            ], (array) $request->cart, $user, [
+                'zone' => $request->input('delivery_zone'),
+                'payment_method' => $request->input('payment_method'),
+                'attribution' => $this->attribution->orderAttributes($request, $shopId),
             ]);
-
-            if (! $order->id || blank($order->invoice_no)) {
-                throw new \RuntimeException('Order was created without an order ID. Please try again.');
-            }
-
-            foreach ($resolvedLines as $line) {
-                OrderItem::create([
-                    'order_id' => $order->id,
-                    'product_id' => $line['product']->id,
-                    'quantity' => $line['qty'],
-                    'unit_price' => $line['unit_price'],
-                    'subtotal' => $line['subtotal'],
-                ]);
-            }
-
-            $order->load('items.product');
-            // Hold inventory immediately so POS/website cannot oversell COD units.
-            $this->stock->reserveWebOrderStock($order, $fallbackUserId);
-            $this->accounts->postWebSale($order);
-            $this->tracking->logInitialPlacement($order);
-
-            DB::commit();
-
-            $payNote = $paymentMethod === DeliveryChargeService::PAY_CONFIRMATION
-                ? 'Confirmation charge ৳'.format_taka_number($paidNow).' · balance due on delivery ৳'.format_taka_number($quote['amount_due_later'])
-                : 'Cash on delivery · total due ৳'.format_taka_number($finalTotal);
-
-            return response()->json([
-                'success' => true,
-                'order_id' => $order->id,
-                'invoice' => $order->invoice_no,
-                'delivery_fee' => $deliveryFee,
-                'grand_total' => $finalTotal,
-                'payment_method' => $paymentMethod,
-                'amount_paid_now' => $paidNow,
-                'amount_due_later' => $quote['amount_due_later'],
-                'message' => 'Order placed successfully. Your Order ID is '.$order->invoice_no.'. '.$payNote,
-            ]);
+        } catch (OrderCreationException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()]);
         } catch (\Exception $e) {
-            DB::rollBack();
             return response()->json(['success' => false, 'message' => 'Order failed: '.$e->getMessage()]);
         }
+
+        $order = $result['order'];
+        $quote = $result['quote'];
+
+        return response()->json([
+            'success' => true,
+            'order_id' => $order->id,
+            'invoice' => $order->invoice_no,
+            'delivery_fee' => $quote['delivery_fee'],
+            'grand_total' => $quote['grand_total'],
+            'payment_method' => $quote['payment_method'],
+            'amount_paid_now' => $quote['amount_paid_now'],
+            'amount_due_later' => $quote['amount_due_later'],
+            'message' => $result['message'],
+        ]);
     }
 }

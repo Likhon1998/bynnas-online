@@ -158,7 +158,7 @@
                 </div>
                 <div class="md:col-span-2">
                     <label class="text-xs font-bold uppercase text-slate-500">Footer tagline</label>
-                    <input name="footer_tagline" value="{{ old('footer_tagline', $settings->footer_tagline) }}" class="mt-1 w-full rounded-xl border-slate-200" placeholder="Your one-stop shop for the latest tech gadgets…">
+                    <input name="footer_tagline" value="{{ old('footer_tagline', $settings->footer_tagline) }}" class="mt-1 w-full rounded-xl border-slate-200" placeholder="Your one-stop shop for trending products…">
                 </div>
                 <div>
                     <label class="text-xs font-bold uppercase text-slate-500">Deals kicker</label>
@@ -174,7 +174,7 @@
                 </div>
                 <div class="md:col-span-2">
                     <label class="text-xs font-bold uppercase text-slate-500">Deals subtitle</label>
-                    <input name="deals_subtitle" value="{{ old('deals_subtitle', $settings->deals_subtitle) }}" class="mt-1 w-full rounded-xl border-slate-200" placeholder="Premium gadgets at carefully chosen prices.">
+                    <input name="deals_subtitle" value="{{ old('deals_subtitle', $settings->deals_subtitle) }}" class="mt-1 w-full rounded-xl border-slate-200" placeholder="Top products at carefully chosen prices.">
                 </div>
                 <div class="md:col-span-2 rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3 text-xs text-indigo-800">
                     Contact email, phone &amp; address are managed under <a href="{{ route('cms.contact.index') }}" class="font-bold underline">CMS → Contact</a> so they stay in sync with the /contact page.

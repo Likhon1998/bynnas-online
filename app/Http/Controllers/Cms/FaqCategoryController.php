@@ -60,7 +60,7 @@ class FaqCategoryController extends Controller
             ['shipping-delivery', 'Do you offer international shipping?', 'We currently deliver within our service area. Contact support if you need help with your location.'],
             ['returns-refunds', 'What is your return policy?', 'Most products can be returned within 30 days if unused and in original packaging. Some items may be excluded — see the product page or contact support.'],
             ['returns-refunds', 'How do I request a return or refund?', 'Go to Help Center or contact support with your order number and reason. Once approved, follow the return shipping instructions we send you.'],
-            ['products-warranty', 'Are your products covered by warranty?', 'Yes. Eligible gadgets include manufacturer or store warranty as shown on each product page. Keep your invoice for warranty claims.'],
+            ['products-warranty', 'Are your products covered by warranty?', 'Yes. Eligible products include manufacturer or store warranty as shown on each product page. Keep your invoice for warranty claims.'],
         ];
 
         foreach ($samples as $i => [$slug, $question, $answer]) {

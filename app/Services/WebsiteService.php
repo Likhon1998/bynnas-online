@@ -17,6 +17,9 @@ use App\Models\PromoBanner;
 use App\Models\Shop;
 use App\Models\SiteFeature;
 use App\Models\SiteSetting;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class WebsiteService
 {
@@ -44,15 +47,15 @@ class WebsiteService
             'categories_eyebrow' => 'Curated collections',
             'categories_title' => 'Shop by',
             'categories_title_accent' => 'Category',
-            'categories_subtitle' => 'Premium gadgets, sorted for how you live — browse the collection.',
+            'categories_subtitle' => 'Everything you love, sorted by category — browse the collection.',
             'flash_eyebrow' => 'Limited time',
             'flash_title' => 'Flash',
             'flash_title_accent' => 'Sale',
-            'flash_subtitle' => 'Today’s best prices on selected gadgets — ends when the timer hits zero.',
+            'flash_subtitle' => 'Today’s best prices on selected products — ends when the timer hits zero.',
             'new_eyebrow' => 'Just landed',
             'new_title' => 'New',
             'new_title_accent' => 'Arrivals',
-            'new_subtitle' => 'Fresh gadgets added to the store — explore what’s new this week.',
+            'new_subtitle' => 'Fresh arrivals added to the store — explore what’s new this week.',
             'trending_eyebrow' => 'Most loved',
             'trending_title' => "What's",
             'trending_title_accent' => 'Trending',
@@ -60,13 +63,13 @@ class WebsiteService
             'brands_eyebrow' => 'Partners',
             'brands_title' => 'Brands We',
             'brands_title_accent' => 'Carry',
-            'brands_subtitle' => 'Trusted names in tech — shop your favorites.',
+            'brands_subtitle' => 'Trusted brands — shop your favorites.',
             'reviews_title' => 'What Our Customers Say',
             'reviews_subtitle' => 'Real feedback from shoppers who bought with us.',
             'blog_eyebrow' => 'From the journal',
             'blog_title' => 'Latest from the',
             'blog_title_accent' => 'Blog',
-            'blog_subtitle' => 'Guides, reviews, and tips from the Maks Gadget team.',
+            'blog_subtitle' => 'Guides, reviews, and tips from the Bynnas Social team.',
         ];
 
         return array_merge($defaults, array_filter($saved ?? [], fn ($v) => $v !== null && $v !== ''));
@@ -93,19 +96,19 @@ class WebsiteService
         }
 
         return (object) [
-            'store_name' => $site->store_name ?: ($shop?->name ?? config('app.name', 'Maks Gadget')),
+            'store_name' => $site->store_name ?: ($shop?->name ?? config('app.name', 'Bynnas Social')),
             'logo_path' => $site->logo_path,
             'favicon_path' => $site->favicon_path,
             'currency_code' => $currencyCode,
             'currency_symbol' => $currencySymbol,
             'special_offer_text' => $site->special_offer_text ?: 'Special Offer!',
             'trusted_by_text' => $site->trusted_by_text ?: 'Trusted by thousands of customers',
-            'footer_tagline' => $site->footer_tagline ?: 'Your one-stop shop for the latest tech gadgets and accessories.',
+            'footer_tagline' => $site->footer_tagline ?: 'Your one-stop shop for trending products, delivered to your door.',
             'home_copy' => $this->homeCopyDefaults($site->home_copy ?? []),
             'deals_kicker' => $site->deals_kicker ?: 'Special Offers',
             'deals_title' => $site->deals_title ?: "Deals You'll",
             'deals_title_accent' => $site->deals_title_accent ?: 'Love',
-            'deals_subtitle' => $site->deals_subtitle ?: 'Grab the best deals on top-quality gadgets and accessories.',
+            'deals_subtitle' => $site->deals_subtitle ?: 'Grab the best deals on top-quality products.',
             'contact_email' => $site->contact_email ?: $shop?->email,
             'contact_phone' => $site->contact_phone ?: $shop?->phone,
             'contact_address' => $site->contact_address ?: $shop?->address,
@@ -220,7 +223,7 @@ class WebsiteService
             ->get()
             ->values();
 
-        // Prefer brands with a logo + products first (Gadget Lovers strip).
+        // Prefer brands with a logo + products first (brands strip).
         $brands = $brands->sortBy([
             fn (Brand $b) => filled($b->logo_path) ? 0 : 1,
             fn (Brand $b) => ((int) $b->products_count > 0) ? 0 : 1,
@@ -593,7 +596,7 @@ class WebsiteService
             // Prefer a stable per-product placeholder so New Arrivals never all look identical.
             if (! $fallback) {
                 $seed = abs(crc32((string) ($product->barcode ?: $product->sku ?: $product->id ?: $product->name)));
-                $fallback = 'https://picsum.photos/seed/gadget'.$seed.'/500/500';
+                $fallback = 'https://picsum.photos/seed/product'.$seed.'/500/500';
             }
 
             $urls[] = $fallback;
@@ -603,215 +606,118 @@ class WebsiteService
     }
 
     /**
-     * Color + memory pickers for a product detail page.
+     * Attribute pickers (Color, Size, …) for a product detail page.
      *
-     * Flow (typical phone store):
-     * 1) Show every color in the variant_group
-     * 2) After a color is selected, show that color's available RAM / storage (ROM) combinations
-     *
-     * Returns:
-     * - colors: swatches linking to the best match for that color
-     * - combos: "4 GB / 64 GB" chips for the active color (preferred UI)
-     * - storages / rams: separate chips when only one dimension is used
+     * @return array{groups: list<array<string, mixed>>, specs: list<array{label: string, value: string}>}
      */
     public function productVariantOptions(Product $product): array
     {
-        $empty = ['colors' => [], 'combos' => [], 'storages' => [], 'rams' => []];
+        return app(ProductVariantService::class)->storefrontOptions($product);
+    }
 
-        if (! $product->variant_group) {
-            return $empty;
+    /**
+     * Attribute filters chosen on the storefront: attr[color][]=red&attr[size][]=m.
+     * Legacy storage[] / ram[] query params map onto the Storage / RAM attributes.
+     *
+     * @return array<string, list<string>> attribute slug => value slugs
+     */
+    public function selectedAttributeFilters(Request $request): array
+    {
+        $selected = [];
+        foreach ((array) $request->input('attr', []) as $slug => $values) {
+            $slug = Str::slug((string) $slug);
+            $values = collect((array) $values)->map(fn ($v) => Str::slug((string) $v))->filter()->unique()->values()->all();
+            if ($slug !== '' && $values !== []) {
+                $selected[$slug] = $values;
+            }
         }
 
-        $family = Product::query()
-            ->where('shop_id', $product->shop_id)
-            ->where('variant_group', $product->variant_group)
-            ->where(function ($q) {
-                $q->where('is_published', true)->orWhereNull('is_published');
-            })
-            ->get()
-            ->unique('id')
-            ->values();
-
-        if ($family->isEmpty()) {
-            $family = collect([$product]);
-        } elseif (! $family->contains(fn (Product $p) => (int) $p->id === (int) $product->id)) {
-            $family->push($product);
+        foreach (['storage', 'ram'] as $legacy) {
+            $values = collect((array) $request->input($legacy, []))
+                ->map(fn ($v) => Str::slug(memory_size_compact((string) $v)))
+                ->filter()->all();
+            if ($values !== []) {
+                $selected[$legacy] = array_values(array_unique(array_merge($selected[$legacy] ?? [], $values)));
+            }
         }
 
-        $inStock = fn (Product $p) => (int) $p->availableStock() > 0;
-        $colorKey = fn (?string $color) => strtolower(trim((string) $color));
-        $ramKey = fn (?string $ram) => memory_size_compact($ram);
-        $storageKey = fn (?string $storage) => memory_size_compact($storage);
+        return $selected;
+    }
 
-        $pickBest = function ($candidates) use ($product, $inStock, $ramKey, $storageKey) {
-            $candidates = collect($candidates)->values();
-            if ($candidates->isEmpty()) {
-                return null;
-            }
+    /**
+     * Keep products whose attribute values match: OR within one attribute, AND across attributes.
+     *
+     * @param  array<string, list<string>>  $selected
+     */
+    public function applyAttributeFilters($query, int $shopId, array $selected): void
+    {
+        $table = $query->getModel()->getTable();
 
-            $prefer = $candidates->filter($inStock);
-            $pool = $prefer->isNotEmpty() ? $prefer : $candidates;
-
-            return $pool->sortBy([
-                fn (Product $p) => $ramKey($p->ram) === $ramKey($product->ram) ? 0 : 1,
-                fn (Product $p) => $storageKey($p->storage) === $storageKey($product->storage) ? 0 : 1,
-                fn (Product $p) => $p->currentPrice(),
-                fn (Product $p) => $p->id,
-            ])->first();
-        };
-
-        // ── Colors (always show every color in the family) ───────────────
-        $colors = [];
-        $seenColors = [];
-        foreach ($family as $row) {
-            $label = trim((string) ($row->color ?? ''));
-            if ($label === '') {
+        foreach ($selected as $attributeSlug => $valueSlugs) {
+            if ($valueSlugs === []) {
                 continue;
             }
-            $key = $colorKey($label);
-            if (isset($seenColors[$key])) {
-                continue;
-            }
-            $seenColors[$key] = true;
-
-            $sameColor = $family->filter(fn (Product $p) => $colorKey($p->color) === $key);
-            $match = $pickBest($sameColor);
-            if (! $match) {
-                continue;
-            }
-
-            $available = $sameColor->contains($inStock);
-            $colors[] = [
-                'label' => $label,
-                'hex' => $match->swatchHex(),
-                'url' => route('website.product', $match),
-                'image' => $this->productImageUrl($match),
-                'active' => $colorKey($product->color) === $key,
-                'product_id' => $match->id,
-                'available' => $available,
-                'barcode' => $match->barcode,
-                'price' => $match->currentPrice(),
-            ];
-        }
-
-        $currentColor = $colorKey($product->color);
-        $forColor = $currentColor !== ''
-            ? $family->filter(fn (Product $p) => $colorKey($p->color) === $currentColor)
-            : $family;
-
-        // ── Combined RAM + storage chips for the active color ────────────
-        $combos = [];
-        $seenCombos = [];
-        foreach ($forColor->sortBy([
-            fn (Product $p) => memory_size_sort_key($p->ram),
-            fn (Product $p) => memory_size_sort_key($p->storage),
-            fn (Product $p) => $p->id,
-        ]) as $row) {
-            $hasRam = filled($row->ram);
-            $hasStorage = filled($row->storage);
-            if (! $hasRam && ! $hasStorage) {
-                continue;
-            }
-
-            $comboKey = ($hasRam ? $ramKey($row->ram) : '-').'|'.($hasStorage ? $storageKey($row->storage) : '-');
-            if (isset($seenCombos[$comboKey])) {
-                continue;
-            }
-            $seenCombos[$comboKey] = true;
-
-            $twins = $forColor->filter(function (Product $p) use ($row, $hasRam, $hasStorage, $ramKey, $storageKey) {
-                $ramOk = ! $hasRam || $ramKey($p->ram) === $ramKey($row->ram);
-                $storageOk = ! $hasStorage || $storageKey($p->storage) === $storageKey($row->storage);
-
-                return $ramOk && $storageOk;
+            $query->whereIn($table.'.id', function ($sub) use ($shopId, $attributeSlug, $valueSlugs) {
+                $sub->select('pvv.product_id')
+                    ->from('product_variant_values as pvv')
+                    ->join('product_attributes as pa', 'pa.id', '=', 'pvv.product_attribute_id')
+                    ->join('product_attribute_values as pav', 'pav.id', '=', 'pvv.product_attribute_value_id')
+                    ->where('pa.shop_id', $shopId)
+                    ->where('pa.slug', $attributeSlug)
+                    ->whereIn('pav.slug', $valueSlugs);
             });
-            $match = $pickBest($twins) ?? $row;
-            $available = $twins->contains($inStock);
-
-            $parts = [];
-            if ($hasRam) {
-                $parts[] = str_replace(' ', '', normalize_memory_size($row->ram) ?? (string) $row->ram);
-            }
-            if ($hasStorage) {
-                $parts[] = str_replace(' ', '', normalize_memory_size($row->storage) ?? (string) $row->storage);
-            }
-
-            $combos[] = [
-                'label' => implode('/', $parts),
-                'ram' => $hasRam ? (normalize_memory_size($row->ram) ?? $row->ram) : null,
-                'storage' => $hasStorage ? (normalize_memory_size($row->storage) ?? $row->storage) : null,
-                'url' => route('website.product', $match),
-                'active' => $ramKey($product->ram) === $ramKey($row->ram)
-                    && $storageKey($product->storage) === $storageKey($row->storage),
-                'product_id' => $match->id,
-                'available' => $available,
-                'price' => $match->currentPrice(),
-                'barcode' => $match->barcode,
-            ];
         }
+    }
 
-        // Prefer combined chips when both dimensions exist for this color.
-        $useCombos = collect($combos)->contains(fn (array $c) => $c['ram'] && $c['storage']);
+    /**
+     * Attribute facets for the products matched by $productQuery (only values actually in use).
+     *
+     * @param  list<string>|null  $onlySlugs  restrict to these attribute slugs (category filter groups)
+     * @return list<array{slug: string, name: string, type: string, options: list<array{value: string, label: string, hex: ?string}>}>
+     */
+    public function attributeFacets(int $shopId, $productQuery, ?array $onlySlugs = null): array
+    {
+        $table = $productQuery->getModel()->getTable();
+        $productIds = (clone $productQuery)->reorder()->select($table.'.id')->toBase();
 
-        $storages = [];
-        $rams = [];
+        $rows = DB::table('product_variant_values as pvv')
+            ->join('product_attributes as pa', 'pa.id', '=', 'pvv.product_attribute_id')
+            ->join('product_attribute_values as pav', 'pav.id', '=', 'pvv.product_attribute_value_id')
+            ->where('pa.shop_id', $shopId)
+            ->when($onlySlugs === null, fn ($q) => $q->where('pa.is_filterable', true))
+            ->when($onlySlugs !== null, fn ($q) => $q->whereIn('pa.slug', $onlySlugs))
+            ->whereIn('pvv.product_id', $productIds)
+            ->select([
+                'pa.slug as attribute_slug', 'pa.name as attribute_name', 'pa.type', 'pa.sort_order as attribute_sort',
+                'pav.slug as value_slug', 'pav.value', 'pav.color_hex', 'pav.sort_order as value_sort',
+            ])
+            ->distinct()
+            ->get();
 
-        if (! $useCombos) {
-            $seenStorage = [];
-            foreach ($forColor->whereNotNull('storage')->sortBy(fn (Product $p) => memory_size_sort_key($p->storage)) as $row) {
-                $compact = $storageKey($row->storage);
-                if ($compact === '' || isset($seenStorage[$compact])) {
-                    continue;
-                }
-                $seenStorage[$compact] = true;
+        return $rows->groupBy('attribute_slug')
+            ->map(function ($values) {
+                $first = $values->first();
+                $isColor = $first->type === \App\Models\ProductAttribute::TYPE_COLOR;
 
-                $twins = $forColor->filter(fn (Product $p) => $storageKey($p->storage) === $compact);
-                $match = $pickBest($twins) ?? $row;
-                $available = $twins->contains($inStock);
-
-                $storages[] = [
-                    'label' => str_replace(' ', '', normalize_memory_size($row->storage) ?? (string) $row->storage),
-                    'url' => route('website.product', $match),
-                    'active' => $storageKey($product->storage) === $compact,
-                    'product_id' => $match->id,
-                    'available' => $available,
-                    'price' => $match->currentPrice(),
+                return [
+                    'slug' => (string) $first->attribute_slug,
+                    'name' => (string) $first->attribute_name,
+                    'type' => (string) $first->type,
+                    'sort' => (int) $first->attribute_sort,
+                    'options' => $values
+                        ->sortBy(fn ($v) => [(int) $v->value_sort, (string) $v->value])
+                        ->map(fn ($v) => [
+                            'value' => (string) $v->value_slug,
+                            'label' => (string) $v->value,
+                            'hex' => $isColor ? ($v->color_hex ?: color_name_to_hex($v->value)) : null,
+                        ])
+                        ->values()
+                        ->all(),
                 ];
-            }
-
-            $seenRam = [];
-            $storageFiltered = filled($product->storage)
-                ? $forColor->filter(fn (Product $p) => $storageKey($p->storage) === $storageKey($product->storage))
-                : $forColor;
-
-            foreach ($storageFiltered->whereNotNull('ram')->sortBy(fn (Product $p) => memory_size_sort_key($p->ram)) as $row) {
-                $compact = $ramKey($row->ram);
-                if ($compact === '' || isset($seenRam[$compact])) {
-                    continue;
-                }
-                $seenRam[$compact] = true;
-
-                $twins = $storageFiltered->filter(fn (Product $p) => $ramKey($p->ram) === $compact);
-                $match = $pickBest($twins) ?? $row;
-                $available = $twins->contains($inStock);
-
-                $rams[] = [
-                    'label' => str_replace(' ', '', normalize_memory_size($row->ram) ?? (string) $row->ram),
-                    'url' => route('website.product', $match),
-                    'active' => $ramKey($product->ram) === $compact,
-                    'product_id' => $match->id,
-                    'available' => $available,
-                    'price' => $match->currentPrice(),
-                ];
-            }
-        }
-
-        return [
-            'colors' => array_values($colors),
-            'combos' => $useCombos ? array_values($combos) : [],
-            'storages' => array_values($storages),
-            'rams' => array_values($rams),
-        ];
+            })
+            ->sortBy(fn ($facet) => [$facet['sort'], $facet['name']])
+            ->values()
+            ->all();
     }
 
     /**
@@ -832,10 +738,7 @@ class WebsiteService
                 continue;
             }
 
-            $best = $group->sortBy([
-                fn (Product $p) => $p->currentPrice(),
-                fn (Product $p) => $p->id,
-            ])->first();
+            $best = $group->sortBy(fn (Product $p) => [$p->currentPrice(), $p->id])->first();
 
             $keep[] = (int) $best->id;
         }

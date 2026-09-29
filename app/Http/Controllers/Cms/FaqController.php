@@ -84,7 +84,7 @@ class FaqController extends Controller
         if (!$settings) {
             $settings = new SiteSetting();
             $settings->default_shop_id = $this->shopId();
-            $settings->store_name = config('app.name', 'Maks Gadget');
+            $settings->store_name = config('app.name', 'Bynnas Social');
             $settings->currency_code = 'BDT';
             $settings->currency_symbol = 'Tk';
         }

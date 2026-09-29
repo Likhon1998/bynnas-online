@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductAttribute;
 use App\Models\ProductImage;
 use App\Services\AccountService;
+use App\Services\ProductVariantService;
 use App\Services\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,6 +24,7 @@ class ProductController extends Controller
     public function __construct(
         protected StockService $stock,
         protected AccountService $accounts,
+        protected ProductVariantService $variants,
     ) {}
     public function index(Request $request)
     {
@@ -122,19 +125,26 @@ class ProductController extends Controller
 
     public function create(Request $request)
     {
-        $categories = Category::where('shop_id', Auth::user()->shop_id)->orderBy('name')->get();
-        $brands = Brand::where('shop_id', Auth::user()->shop_id)->where('is_active', true)->orderBy('name')->get();
-        $returnTo = $this->productReturnRoute($request->query('from'));
+        $shopId = Auth::user()->shop_id;
+        ProductAttribute::ensureDefaults($shopId);
 
-        return view('products.create', compact('categories', 'brands', 'returnTo'));
+        $categories = Category::where('shop_id', $shopId)->orderBy('name')->get();
+        $brands = Brand::where('shop_id', $shopId)->where('is_active', true)->orderBy('name')->get();
+        $returnTo = $this->productReturnRoute($request->query('from'));
+        $productAttributes = ProductAttribute::forShop($shopId)->with('values')->get();
+        $variantOf = $request->filled('variant_of')
+            ? Product::where('shop_id', $shopId)->find((int) $request->query('variant_of'))
+            : null;
+
+        return view('products.create', compact('categories', 'brands', 'returnTo', 'productAttributes', 'variantOf'));
     }
 
     public function store(Request $request)
     {
         $shopId = Auth::user()->shop_id;
-        $isGadget = $request->input('product_mode') === 'gadget';
+        $isVariable = $request->input('product_mode') === 'variable';
 
-        if ($isGadget && is_array($request->input('variants'))) {
+        if ($isVariable && is_array($request->input('variants'))) {
             $variants = $request->input('variants', []);
             foreach ($variants as $i => $row) {
                 foreach (['cost_price', 'selling_price', 'stock_quantity'] as $key) {
@@ -146,103 +156,88 @@ class ProductController extends Controller
             $request->merge(['variants' => $variants]);
         }
 
-        $rules = [
-            'product_mode' => 'required|in:simple,gadget',
-            'name' => 'required|string|max:255',
-            'sku' => 'nullable|string|max:100',
-            'variant_group' => 'nullable|string|max:120',
-            'color' => 'nullable|string|max:80',
-            'color_hex' => 'nullable|string|max:7',
-            'storage' => 'nullable|string|max:40',
-            'ram' => 'nullable|string|max:40',
-            'requires_imei' => 'nullable|boolean',
-            'imei_list' => 'nullable|string|max:10000',
-            'availability' => 'nullable|in:in_stock,pre_order,up_coming,out_of_stock',
-            'cost_price' => 'required|numeric|min:0',
-            'selling_price' => 'required|numeric|min:0',
-            'pos_discount_type' => 'nullable|in:percent,fixed',
-            'pos_discount_value' => 'nullable|numeric|min:0.01|required_with:pos_discount_type',
-            'short_description' => 'nullable|string|max:2000',
-            'category_id' => [
-                'nullable',
-                Rule::exists('categories', 'id')->where(fn ($q) => $q->where('shop_id', $shopId)),
-            ],
-            'brand_id' => [
-                'nullable',
-                Rule::exists('brands', 'id')->where(fn ($q) => $q->where('shop_id', $shopId)),
-            ],
-            'images' => 'nullable|array|max:20',
-            'images.*' => 'image|mimes:jpeg,png,jpg,webp,gif|max:5120',
-            'is_published' => 'nullable|boolean',
-            'is_new_arrival' => 'nullable|boolean',
-            'is_best_seller' => 'nullable|boolean',
-            'is_featured' => 'nullable|boolean',
+        $rules = array_merge($this->productRules($shopId), [
+            'product_mode' => 'required|in:simple,variable',
+            'barcode' => ['nullable', 'string', 'max:100', Rule::unique('products', 'barcode')],
             'stock_quantity' => 'nullable|integer|min:0',
-            'alert_quantity' => 'nullable|integer|min:0',
+            'variant_of' => 'nullable|integer',
             'return_to' => 'nullable|in:opening-inventory',
-        ];
+        ]);
 
-        if ($isGadget) {
-            $rules['barcode'] = 'nullable|string|max:100';
-            $rules['variants'] = 'required|array|min:1';
-            $rules['variants.*.barcode'] = ['required', 'string', 'max:100', Rule::unique('products', 'barcode')];
-            $rules['variants.*.color'] = 'nullable|string|max:80';
-            $rules['variants.*.color_hex'] = 'nullable|string|max:7';
-            $rules['variants.*.ram'] = 'nullable|string|max:40';
-            $rules['variants.*.storage'] = 'nullable|string|max:40';
-            $rules['variants.*.cost_price'] = 'nullable|numeric|min:0';
-            $rules['variants.*.selling_price'] = 'nullable|numeric|min:0';
-            $rules['variants.*.stock_quantity'] = 'nullable|integer|min:0';
-            $rules['variants.*.imei_list'] = 'nullable|string|max:10000';
-            $rules['variants.*.images'] = 'nullable|array|max:20';
-            $rules['variants.*.images.*'] = 'image|mimes:jpeg,png,jpg,webp,gif|max:5120';
-        } else {
-            $rules['barcode'] = ['required', 'string', 'max:100', Rule::unique('products', 'barcode')];
+        if ($isVariable) {
+            $rules = array_merge($rules, [
+                'variants' => 'required|array|min:1|max:100',
+                'variants.*.barcode' => ['nullable', 'string', 'max:100', Rule::unique('products', 'barcode')],
+                'variants.*.sku' => 'nullable|string|max:100',
+                'variants.*.options' => 'nullable|array',
+                'variants.*.options.*.value' => 'nullable|string|max:120',
+                'variants.*.options.*.hex' => 'nullable|string|max:7',
+                'variants.*.cost_price' => 'nullable|numeric|min:0',
+                'variants.*.selling_price' => 'nullable|numeric|min:0',
+                'variants.*.stock_quantity' => 'nullable|integer|min:0',
+                'variants.*.imei_list' => 'nullable|string|max:10000',
+                'variants.*.images' => 'nullable|array|max:20',
+                'variants.*.images.*' => 'image|mimes:jpeg,png,jpg,webp,gif|max:5120',
+            ]);
         }
 
         $validated = $request->validate($rules);
+        $attributes = ProductAttribute::forShop($shopId)->get();
 
-        if ($isGadget) {
-            $barcodes = collect($validated['variants'])->pluck('barcode')->map(fn ($b) => trim((string) $b));
-            if ($barcodes->filter()->count() !== $barcodes->unique()->count()) {
+        if ($isVariable) {
+            $barcodes = collect($validated['variants'])->pluck('barcode')->map(fn ($b) => trim((string) $b))->filter();
+            if ($barcodes->count() !== $barcodes->unique()->count()) {
                 return back()->withErrors(['variants' => 'Each variant must have a unique barcode.'])->withInput();
+            }
+
+            $combos = collect($validated['variants'])->map(fn ($row) => $this->optionLabels($row['options'] ?? [], $attributes)->map(fn ($v) => mb_strtolower($v))->implode('|'));
+            if ($combos->contains('')) {
+                return back()->withErrors(['variants' => 'Give every variant at least one option, such as a color or size.'])->withInput();
+            }
+            if ($combos->count() !== $combos->unique()->count()) {
+                return back()->withErrors(['variants' => 'Two variants have the same options. Each combination must be unique.'])->withInput();
             }
         }
 
-        $openingQty = (int) ($validated['stock_quantity'] ?? 0);
-        $uploadedPaths = [];
-        $requiresImei = $request->boolean('requires_imei');
-
-        if (! empty($validated['pos_discount_type'])) {
-            $list = (float) $validated['selling_price'];
-            $offer = $validated['pos_discount_type'] === 'percent'
-                ? $list * (1 - (float) $validated['pos_discount_value'] / 100)
-                : $list - (float) $validated['pos_discount_value'];
-            if ($offer <= 0 || $offer >= $list) {
-                return back()->withErrors([
-                    'pos_discount_value' => 'Discount must leave an offer price below the selling price.',
-                ])->withInput();
-            }
-        } else {
+        if ($error = $this->discountError($validated)) {
+            return back()->withErrors(['pos_discount_value' => $error])->withInput();
+        }
+        if (empty($validated['pos_discount_type'])) {
             $validated['pos_discount_type'] = null;
             $validated['pos_discount_value'] = null;
         }
 
+        $openingQty = (int) ($validated['stock_quantity'] ?? 0);
+        $uploadedPaths = [];
+        $requiresImei = retail_enabled() && $request->boolean('requires_imei');
+        $variantOf = filled($validated['variant_of'] ?? null)
+            ? Product::where('shop_id', $shopId)->find((int) $validated['variant_of'])
+            : null;
+
         try {
-            $created = DB::transaction(function () use ($request, $validated, $shopId, $openingQty, $isGadget, $requiresImei, &$uploadedPaths) {
+            $created = DB::transaction(function () use ($request, $validated, $shopId, $openingQty, $isVariable, $requiresImei, $attributes, $variantOf, &$uploadedPaths) {
+                $ogImage = $this->storeOgImage($request);
+                if ($ogImage) {
+                    $uploadedPaths[] = $ogImage;
+                }
+
                 $shared = [
                     'shop_id' => $shopId,
                     'name' => $validated['name'],
                     'sku' => $validated['sku'] ?? null,
-                    'variant_group' => $validated['variant_group'] ?? null,
+                    'variant_group' => $variantOf?->variant_group ?: ($validated['variant_group'] ?? null),
                     'availability' => $validated['availability'] ?? 'in_stock',
                     'cost_price' => $validated['cost_price'],
                     'selling_price' => $validated['selling_price'],
-                    'pos_discount_type' => $validated['pos_discount_type'] ?? null,
-                    'pos_discount_value' => ! empty($validated['pos_discount_type'])
-                        ? ($validated['pos_discount_value'] ?? null)
-                        : null,
+                    'pos_discount_type' => $validated['pos_discount_type'],
+                    'pos_discount_value' => $validated['pos_discount_value'],
                     'short_description' => $validated['short_description'] ?? null,
+                    'description' => $validated['description'] ?? null,
+                    'seo_title' => $validated['seo_title'] ?? null,
+                    'meta_description' => $validated['meta_description'] ?? null,
+                    'og_title' => $validated['og_title'] ?? null,
+                    'og_description' => $validated['og_description'] ?? null,
+                    'og_image' => $ogImage,
                     'category_id' => $validated['category_id'] ?? null,
                     'brand_id' => $validated['brand_id'] ?? null,
                     'stock_quantity' => 0,
@@ -253,109 +248,79 @@ class ProductController extends Controller
                     'is_best_seller' => $request->boolean('is_best_seller'),
                     'is_featured' => $request->boolean('is_featured'),
                 ];
-                $shared = $this->applyBrandData($shared);
-                $shared = $this->normalizeVariantFields($shared);
+                $shared = $this->normalizeVariantFields($this->applyBrandData($shared));
 
-                if (! $isGadget) {
-                    $data = array_merge($shared, [
-                        'barcode' => trim($validated['barcode']),
-                        'color' => $validated['color'] ?? null,
-                        'color_hex' => $validated['color_hex'] ?? null,
-                        'storage' => $validated['storage'] ?? null,
-                        'ram' => $validated['ram'] ?? null,
-                    ]);
-                    $data = $this->normalizeVariantFields($data);
-                    $product = Product::create($data);
-                    $uploadedPaths = $this->storeGalleryImages($request, $product);
+                if (! $isVariable) {
+                    $options = $validated['attributes'] ?? [];
+                    $name = $shared['name'];
+                    if ($variantOf) {
+                        $labels = $this->optionLabels($options, $attributes);
+                        $name = $validated['name'].($labels->isNotEmpty() ? ' — '.$labels->implode(' / ') : '');
+                    }
+
+                    $product = Product::create(array_merge($shared, [
+                        'name' => $name,
+                        'barcode' => filled($validated['barcode'] ?? null) ? trim($validated['barcode']) : $this->variants->generateCode(),
+                    ]));
+                    $this->variants->syncValues($product, $options);
+
+                    $uploadedPaths = array_merge($uploadedPaths, $this->storeGalleryImages($request, $product));
+                    if ($variantOf && ! $request->hasFile('images')) {
+                        $this->cloneGalleryToProduct($variantOf, $product);
+                    }
                     $this->syncPrimaryImageFromGallery($product);
 
-                    $imeiCount = 0;
-                    if ($requiresImei) {
-                        $imeiCount = $this->applyImeiList($product, (string) ($validated['imei_list'] ?? ''));
-                    }
-
+                    $imeiCount = $requiresImei ? $this->applyImeiList($product, (string) ($validated['imei_list'] ?? '')) : 0;
                     $qty = $requiresImei && $imeiCount > 0 ? $imeiCount : $openingQty;
-                    if ($qty > 0) {
-                        $this->stock->ensureDefaultLocations($product->shop_id);
-                        $movement = $this->stock->setOpeningStock($product, $qty);
-                        $this->accounts->postOpeningInventory($movement);
-                    }
+                    $this->recordOpeningStock($product, $qty);
 
-                    return ['count' => 1, 'opening' => $qty, 'product' => $product->fresh(['galleryImages'])];
+                    return ['count' => 1, 'opening' => $qty, 'product' => $product];
                 }
 
-                // Gadget: one Product per variant — own barcode, optional own price & photos.
-                $products = [];
+                $group = $shared['variant_group'] ?: (Str::slug($validated['name']) ?: null);
+                $count = 0;
                 $totalOpening = 0;
                 $first = null;
                 $gallerySource = null;
-                foreach ($validated['variants'] as $index => $row) {
-                    $cost = isset($row['cost_price']) && $row['cost_price'] !== '' && $row['cost_price'] !== null
-                        ? (float) $row['cost_price']
-                        : (float) $validated['cost_price'];
-                    $sell = isset($row['selling_price']) && $row['selling_price'] !== '' && $row['selling_price'] !== null
-                        ? (float) $row['selling_price']
-                        : (float) $validated['selling_price'];
 
-                    $data = array_merge($shared, [
-                        'barcode' => trim($row['barcode']),
-                        'color' => $row['color'] ?? null,
-                        'color_hex' => $row['color_hex'] ?? null,
-                        'storage' => $row['storage'] ?? null,
-                        'ram' => $row['ram'] ?? null,
+                foreach ($validated['variants'] as $index => $row) {
+                    $labels = $this->optionLabels($row['options'] ?? [], $attributes);
+                    $cost = isset($row['cost_price']) && $row['cost_price'] !== null ? (float) $row['cost_price'] : (float) $validated['cost_price'];
+                    $sell = isset($row['selling_price']) && $row['selling_price'] !== null ? (float) $row['selling_price'] : (float) $validated['selling_price'];
+
+                    $product = Product::create(array_merge($shared, [
+                        'name' => $validated['name'].($labels->isNotEmpty() ? ' — '.$labels->implode(' / ') : ''),
+                        'variant_group' => $group,
+                        'barcode' => filled($row['barcode'] ?? null) ? trim($row['barcode']) : $this->variants->generateCode(),
+                        'sku' => filled($row['sku'] ?? null) ? trim($row['sku']) : $shared['sku'],
                         'cost_price' => $cost,
                         'selling_price' => $sell,
-                    ]);
-                    $data = $this->normalizeVariantFields($data);
-                    if (empty($data['variant_group'])) {
-                        $data['variant_group'] = $this->normalizeVariantFields([
-                            'variant_group' => $validated['name'],
-                        ])['variant_group'] ?? null;
-                    }
-
-                    $product = Product::create($data);
-                    if ($index === 0) {
-                        $first = $product;
-                    }
+                    ]));
+                    $this->variants->syncValues($product, $row['options'] ?? []);
+                    $first ??= $product;
 
                     $variantFiles = $request->file("variants.{$index}.images");
-                    $hasVariantImages = is_array($variantFiles) && collect($variantFiles)->filter()->isNotEmpty();
-
-                    if ($hasVariantImages) {
-                        $paths = $this->storeGalleryFiles($product, $variantFiles);
-                        $uploadedPaths = array_merge($uploadedPaths, $paths);
+                    if (is_array($variantFiles) && collect($variantFiles)->filter()->isNotEmpty()) {
+                        $uploadedPaths = array_merge($uploadedPaths, $this->storeGalleryFiles($product, $variantFiles));
                         $this->syncPrimaryImageFromGallery($product);
                         $gallerySource = $product;
                     } elseif ($index === 0 && $request->hasFile('images')) {
-                        $paths = $this->storeGalleryImages($request, $product);
-                        $uploadedPaths = array_merge($uploadedPaths, $paths);
+                        $uploadedPaths = array_merge($uploadedPaths, $this->storeGalleryImages($request, $product));
                         $this->syncPrimaryImageFromGallery($product);
                         $gallerySource = $product;
                     } elseif ($gallerySource) {
                         $this->cloneGalleryToProduct($gallerySource, $product);
                     }
 
-                    $imeiCount = 0;
-                    if ($requiresImei) {
-                        $imeiCount = $this->applyImeiList($product, (string) ($row['imei_list'] ?? ''));
-                    }
-                    $qty = $requiresImei && $imeiCount > 0
-                        ? $imeiCount
-                        : (int) ($row['stock_quantity'] ?? 0);
-                    if ($qty > 0) {
-                        $this->stock->ensureDefaultLocations($product->shop_id);
-                        $movement = $this->stock->setOpeningStock($product, $qty);
-                        $this->accounts->postOpeningInventory($movement);
-                    }
+                    $imeiCount = $requiresImei ? $this->applyImeiList($product, (string) ($row['imei_list'] ?? '')) : 0;
+                    $qty = $requiresImei && $imeiCount > 0 ? $imeiCount : (int) ($row['stock_quantity'] ?? 0);
+                    $this->recordOpeningStock($product, $qty);
+
                     $totalOpening += $qty;
-                    $products[] = $product;
+                    $count++;
                 }
 
-                return [
-                    'count' => count($products),
-                    'opening' => $totalOpening,
-                    'product' => $first?->fresh(['galleryImages']),
-                ];
+                return ['count' => $count, 'opening' => $totalOpening, 'product' => $first];
             });
         } catch (\Throwable $e) {
             foreach ($uploadedPaths as $path) {
@@ -385,103 +350,110 @@ class ProductController extends Controller
             );
         }
 
-        if ($count > 1) {
-            $message = "{$count} gadget variants created (each with its own barcode)".($openingQty > 0 ? ", {$openingQty} units stocked." : '.');
-        } else {
-            $message = $openingQty > 0
-                ? "Product added with {$openingQty} units in stock. It can appear in POS and the online store."
-                : 'Product added with 0 stock. Set quantity here next time, or use Opening Inventory / Stock Adjustment.';
-        }
+        $message = $count > 1
+            ? "{$count} variants created".($openingQty > 0 ? ", {$openingQty} units stocked." : '.')
+            : ($openingQty > 0
+                ? "Product added with {$openingQty} units in stock."
+                : 'Product added with 0 stock. Add stock via Opening Inventory or Stock Adjustment.');
 
         return redirect()->route('products.index')->with('success', $message);
     }
 
     public function edit(Product $product)
     {
-        if ($product->shop_id !== Auth::user()->shop_id) {
+        $shopId = Auth::user()->shop_id;
+        if ($product->shop_id !== $shopId) {
             abort(403, 'Unauthorized access.');
         }
+        ProductAttribute::ensureDefaults($shopId);
 
-        $categories = Category::where('shop_id', Auth::user()->shop_id)->orderBy('name')->get();
-        $brands = Brand::where('shop_id', Auth::user()->shop_id)->orderBy('name')->get();
-        $product->load(['galleryImages', 'availableImeis']);
+        $categories = Category::where('shop_id', $shopId)->orderBy('name')->get();
+        $brands = Brand::where('shop_id', $shopId)->orderBy('name')->get();
+        $productAttributes = ProductAttribute::forShop($shopId)->with('values')->get();
+        $product->load(['galleryImages', 'availableImeis', 'variantValues.attributeValue']);
+        $siblings = $product->variant_group
+            ? Product::where('shop_id', $shopId)
+                ->where('variant_group', $product->variant_group)
+                ->where('id', '!=', $product->id)
+                ->with('variantValues.attribute', 'variantValues.attributeValue')
+                ->orderBy('id')
+                ->get()
+            : collect();
 
-        return view('products.edit', compact('product', 'categories', 'brands'));
+        return view('products.edit', compact('product', 'categories', 'brands', 'productAttributes', 'siblings'));
     }
 
     public function update(Request $request, Product $product)
     {
-        if ($product->shop_id !== Auth::user()->shop_id) {
+        $shopId = Auth::user()->shop_id;
+        if ($product->shop_id !== $shopId) {
             abort(403, 'Unauthorized access.');
         }
 
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'barcode' => 'required|string|unique:products,barcode,' . $product->id,
-            'sku' => 'nullable|string|max:100',
-            'variant_group' => 'nullable|string|max:120',
-            'color' => 'nullable|string|max:80',
-            'color_hex' => 'nullable|string|max:7',
-            'storage' => 'nullable|string|max:40',
-            'ram' => 'nullable|string|max:40',
-            'requires_imei' => 'nullable|boolean',
-            'imei_list' => 'nullable|string|max:10000',
-            'availability' => 'nullable|in:in_stock,pre_order,up_coming,out_of_stock',
-            'cost_price' => 'required|numeric',
-            'selling_price' => 'required|numeric',
-            'pos_discount_type' => 'nullable|in:percent,fixed',
-            'pos_discount_value' => 'nullable|numeric|min:0.01|required_with:pos_discount_type',
-            'short_description' => 'nullable|string|max:2000',
-            'category_id' => 'nullable|exists:categories,id',
-            'brand_id' => 'nullable|exists:brands,id',
-            'images' => 'nullable|array|max:20',
-            'images.*' => 'image|mimes:jpeg,png,jpg,webp,gif|max:5120',
+        $validated = $request->validate(array_merge($this->productRules($shopId), [
+            'barcode' => ['nullable', 'string', 'max:100', Rule::unique('products', 'barcode')->ignore($product->id)],
             'remove_images' => 'nullable|array',
             'remove_images.*' => 'integer',
-            'is_published' => 'nullable|boolean',
-            'is_new_arrival' => 'nullable|boolean',
-            'is_best_seller' => 'nullable|boolean',
-            'is_featured' => 'nullable|boolean',
-        ]);
+            'remove_og_image' => 'nullable|boolean',
+        ]));
 
-        $data = $request->except([
-            'image', 'image_2', 'image_3', 'images', 'remove_images', 'stock_quantity',
-            'remove_image', 'remove_image_2', 'remove_image_3',
-            'is_published', 'is_new_arrival', 'is_best_seller', 'is_featured',
-            'product_mode', 'imei_list', 'variants',
-        ]);
-        $data['is_published'] = $request->boolean('is_published');
-        $data['is_new_arrival'] = $request->boolean('is_new_arrival');
-        $data['is_best_seller'] = $request->boolean('is_best_seller');
-        $data['is_featured'] = $request->boolean('is_featured');
-        $data['requires_imei'] = $request->boolean('requires_imei');
-        $data['availability'] = $request->input('availability', $product->availability ?? 'in_stock');
-        if (empty($data['pos_discount_type'])) {
-            $data['pos_discount_type'] = null;
-            $data['pos_discount_value'] = null;
+        if ($error = $this->discountError($validated)) {
+            return back()->withErrors(['pos_discount_value' => $error])->withInput();
         }
-        $data = $this->applyBrandData($data);
-        $data = $this->normalizeVariantFields($data);
 
-        if (! empty($data['pos_discount_type']) && isset($data['pos_discount_value'], $data['selling_price'])) {
-            $offer = $data['pos_discount_type'] === 'percent'
-                ? (float) $data['selling_price'] * (1 - (float) $data['pos_discount_value'] / 100)
-                : (float) $data['selling_price'] - (float) $data['pos_discount_value'];
-            if ($offer <= 0 || $offer >= (float) $data['selling_price']) {
-                return back()->withErrors([
-                    'pos_discount_value' => 'Discount must leave an offer price below the selling price.',
-                ])->withInput();
-            }
+        $data = [
+            'name' => $validated['name'],
+            'barcode' => filled($validated['barcode'] ?? null)
+                ? trim($validated['barcode'])
+                : ($product->barcode ?: $this->variants->generateCode()),
+            'sku' => $validated['sku'] ?? null,
+            'variant_group' => $validated['variant_group'] ?? $product->variant_group,
+            'availability' => $validated['availability'] ?? ($product->availability ?? 'in_stock'),
+            'cost_price' => $validated['cost_price'],
+            'selling_price' => $validated['selling_price'],
+            'pos_discount_type' => $validated['pos_discount_type'] ?? null,
+            'pos_discount_value' => ! empty($validated['pos_discount_type']) ? ($validated['pos_discount_value'] ?? null) : null,
+            'short_description' => $validated['short_description'] ?? null,
+            'description' => $validated['description'] ?? null,
+            'seo_title' => $validated['seo_title'] ?? null,
+            'meta_description' => $validated['meta_description'] ?? null,
+            'og_title' => $validated['og_title'] ?? null,
+            'og_description' => $validated['og_description'] ?? null,
+            'category_id' => $validated['category_id'] ?? null,
+            'brand_id' => $validated['brand_id'] ?? null,
+            'alert_quantity' => $validated['alert_quantity'] ?? ($product->alert_quantity ?? 5),
+            'is_published' => $request->boolean('is_published'),
+            'is_new_arrival' => $request->boolean('is_new_arrival'),
+            'is_best_seller' => $request->boolean('is_best_seller'),
+            'is_featured' => $request->boolean('is_featured'),
+        ];
+        if (retail_enabled()) {
+            $data['requires_imei'] = $request->boolean('requires_imei');
         }
+        $data = $this->normalizeVariantFields($this->applyBrandData($data));
 
         try {
-            DB::transaction(function () use ($request, $product, $data) {
+            DB::transaction(function () use ($request, $product, $data, $validated) {
+                $oldOgImage = $product->og_image;
+                $newOgImage = $this->storeOgImage($request);
+                if ($newOgImage) {
+                    $data['og_image'] = $newOgImage;
+                } elseif ($request->boolean('remove_og_image')) {
+                    $data['og_image'] = null;
+                }
+
                 $product->update($data);
+                $this->variants->syncValues($product, $validated['attributes'] ?? []);
                 $this->removeGalleryImages($product, (array) $request->input('remove_images', []));
                 $this->storeGalleryImages($request, $product);
                 $this->syncPrimaryImageFromGallery($product);
 
-                if ($product->requires_imei) {
+                if (array_key_exists('og_image', $data) && $oldOgImage && $oldOgImage !== $data['og_image']
+                    && ! Product::where('og_image', $oldOgImage)->exists()) {
+                    Storage::disk('public')->delete($oldOgImage);
+                }
+
+                if (retail_enabled() && $product->requires_imei) {
                     $this->applyImeiList($product, (string) $request->input('imei_list', ''));
                 }
             });
@@ -490,6 +462,94 @@ class ProductController extends Controller
         }
 
         return redirect()->route('products.index')->with('success', 'Product updated successfully!');
+    }
+
+    /** Validation shared by create and edit. */
+    private function productRules(int $shopId): array
+    {
+        return [
+            'name' => 'required|string|max:255',
+            'sku' => 'nullable|string|max:100',
+            'variant_group' => 'nullable|string|max:120',
+            'attributes' => 'nullable|array',
+            'attributes.*.value' => 'nullable|string|max:120',
+            'attributes.*.hex' => 'nullable|string|max:7',
+            'requires_imei' => 'nullable|boolean',
+            'imei_list' => 'nullable|string|max:10000',
+            'availability' => 'nullable|in:in_stock,pre_order,up_coming,out_of_stock',
+            'cost_price' => 'required|numeric|min:0',
+            'selling_price' => 'required|numeric|min:0',
+            'pos_discount_type' => 'nullable|in:percent,fixed',
+            'pos_discount_value' => 'nullable|numeric|min:0.01|required_with:pos_discount_type',
+            'short_description' => 'nullable|string|max:2000',
+            'description' => 'nullable|string|max:20000',
+            'seo_title' => 'nullable|string|max:255',
+            'meta_description' => 'nullable|string|max:500',
+            'og_title' => 'nullable|string|max:255',
+            'og_description' => 'nullable|string|max:500',
+            'og_image_file' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'category_id' => ['nullable', Rule::exists('categories', 'id')->where(fn ($q) => $q->where('shop_id', $shopId))],
+            'brand_id' => ['nullable', Rule::exists('brands', 'id')->where(fn ($q) => $q->where('shop_id', $shopId))],
+            'images' => 'nullable|array|max:20',
+            'images.*' => 'image|mimes:jpeg,png,jpg,webp,gif|max:5120',
+            'is_published' => 'nullable|boolean',
+            'is_new_arrival' => 'nullable|boolean',
+            'is_best_seller' => 'nullable|boolean',
+            'is_featured' => 'nullable|boolean',
+            'alert_quantity' => 'nullable|integer|min:0',
+        ];
+    }
+
+    private function discountError(array $validated): ?string
+    {
+        if (empty($validated['pos_discount_type'])) {
+            return null;
+        }
+
+        $list = (float) $validated['selling_price'];
+        $offer = $validated['pos_discount_type'] === 'percent'
+            ? $list * (1 - (float) ($validated['pos_discount_value'] ?? 0) / 100)
+            : $list - (float) ($validated['pos_discount_value'] ?? 0);
+
+        return $offer <= 0 || $offer >= $list
+            ? 'Discount must leave an offer price below the selling price.'
+            : null;
+    }
+
+    /**
+     * Option labels in attribute order, e.g. ["Red", "XL"].
+     *
+     * @param  array<int|string, mixed>  $options
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    private function optionLabels(array $options, $attributes)
+    {
+        return $attributes
+            ->map(function (ProductAttribute $attribute) use ($options) {
+                $raw = $options[$attribute->id] ?? null;
+
+                return trim((string) (is_array($raw) ? ($raw['value'] ?? '') : $raw));
+            })
+            ->filter(fn ($label) => $label !== '')
+            ->values();
+    }
+
+    private function recordOpeningStock(Product $product, int $qty): void
+    {
+        if ($qty <= 0) {
+            return;
+        }
+
+        $this->stock->ensureDefaultLocations($product->shop_id);
+        $movement = $this->stock->setOpeningStock($product, $qty);
+        $this->accounts->postOpeningInventory($movement);
+    }
+
+    private function storeOgImage(Request $request): ?string
+    {
+        $file = $request->file('og_image_file');
+
+        return $file && $file->isValid() ? $file->store('products/og', 'public') : null;
     }
 
     public function toggleHomepageFlag(Request $request, Product $product)
@@ -542,79 +602,18 @@ class ProductController extends Controller
     public function importTemplate()
     {
         $headers = [
-            'name',
-            'barcode',
-            'sku',
-            'category',
-            'brand',
-            'cost_price',
-            'selling_price',
-            'stock_quantity',
-            'alert_quantity',
-            'image_url',
-            'color',
-            'color_hex',
-            'ram',
-            'storage',
-            'variant_group',
-            'short_description',
+            'name', 'barcode', 'sku', 'category', 'brand',
+            'cost_price', 'selling_price', 'stock_quantity', 'alert_quantity', 'image_url',
+            'variant_group', 'color', 'color_hex', 'size', 'material',
+            'short_description', 'description', 'seo_title', 'meta_description',
         ];
 
         $rows = [
-            [
-                'Samsung Galaxy S22 — Green / 8GB / 128GB',
-                '8801234567001',
-                'SKU-S22-G-128',
-                'Smartphones',
-                'Samsung',
-                '24500',
-                '28999',
-                '10',
-                '5',
-                '',
-                'Green',
-                '#16a34a',
-                '8GB',
-                '128GB',
-                'samsung-s22',
-                'Demo phone — add photo later or paste image_url.',
-            ],
-            [
-                'Somostel 65W GaN Charger',
-                '8801234567002',
-                'SKU-CHG-65W',
-                'Chargers',
-                'Somostel',
-                '900',
-                '1490',
-                '40',
-                '8',
-                '',
-                '',
-                '',
-                '',
-                '',
-                '',
-                'Fast GaN charger for phones and laptops.',
-            ],
-            [
-                'Oraimo FreePods 4',
-                '8801234567003',
-                'SKU-EAR-FP4',
-                'Earbuds',
-                'Oraimo',
-                '1600',
-                '2290',
-                '22',
-                '5',
-                '',
-                'Black',
-                '#111827',
-                '',
-                '',
-                '',
-                'True wireless earbuds with deep bass.',
-            ],
+            ['Classic Cotton T-Shirt - Black / M', '', 'TEE-BLK-M', 'Fashion', 'Bynnas Basics', '320', '650', '25', '5', '', 'classic-cotton-tee', 'Black', '#111827', 'M', 'Cotton', 'Soft 180 GSM cotton tee for everyday wear.', '', 'Classic Cotton T-Shirt | Bynnas Social', 'Breathable cotton t-shirt in black. Order online with cash on delivery.'],
+            ['Classic Cotton T-Shirt - Black / L', '', 'TEE-BLK-L', 'Fashion', 'Bynnas Basics', '320', '650', '18', '5', '', 'classic-cotton-tee', 'Black', '#111827', 'L', 'Cotton', 'Soft 180 GSM cotton tee for everyday wear.', '', '', ''],
+            ['Classic Cotton T-Shirt - White / M', '', 'TEE-WHT-M', 'Fashion', 'Bynnas Basics', '320', '650', '20', '5', '', 'classic-cotton-tee', 'White', '#ffffff', 'M', 'Cotton', 'Soft 180 GSM cotton tee for everyday wear.', '', '', ''],
+            ['Matte Lipstick - Ruby Red', '', 'LIP-RUBY', 'Cosmetics', 'Glow Lab', '180', '450', '40', '8', '', 'matte-lipstick', 'Ruby Red', '#9f1239', '', '', 'Long-lasting matte finish.', '', '', ''],
+            ['Ceramic Coffee Mug 350ml', '8801234500011', 'MUG-350', 'Home & Kitchen', '', '150', '390', '30', '5', '', '', '', '', '', 'Ceramic', 'Dishwasher-safe mug.', '', '', ''],
         ];
 
         $escape = function ($value): string {
@@ -637,7 +636,7 @@ class ProductController extends Controller
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="akhitelecom-products-demo.csv"',
+            'Content-Disposition' => 'attachment; filename="bynnas-social-products-template.csv"',
         ]);
     }
 
@@ -710,12 +709,50 @@ class ProductController extends Controller
             'photo' => 'image_url',
             'photo_url' => 'image_url',
             'picture' => 'image_url',
-            'description' => 'short_description',
+            'summary' => 'short_description',
+            'long_description' => 'description',
+            'meta_title' => 'seo_title',
             'rom' => 'storage',
+            'colour' => 'color',
         ];
         $header = array_map(fn ($h) => $aliases[$h] ?? $h, $header);
 
-        $required = ['name', 'barcode', 'cost_price', 'selling_price'];
+        // Columns named after an attribute (color, size, storage…) become variant values;
+        // "attr_fabric" style columns create the attribute when it does not exist yet.
+        ProductAttribute::ensureDefaults((int) $shopId);
+        $reserved = [
+            'name', 'barcode', 'sku', 'category', 'brand', 'cost_price', 'selling_price', 'stock_quantity',
+            'alert_quantity', 'image_url', 'variant_group', 'color_hex', 'short_description', 'description',
+            'seo_title', 'meta_description', 'og_title', 'og_description',
+        ];
+        $shopAttributes = ProductAttribute::where('shop_id', $shopId)->get()->keyBy('slug');
+        $attributeColumns = [];
+        foreach ($header as $column) {
+            if (in_array($column, $reserved, true) || $column === '') {
+                continue;
+            }
+            if (str_starts_with($column, 'attr_') || str_starts_with($column, 'attribute:')) {
+                $label = trim(preg_replace('/^(attr_|attribute:)/', '', $column) ?? '');
+                $slug = Str::slug(str_replace('_', ' ', $label));
+                if ($slug === '') {
+                    continue;
+                }
+                $attribute = $shopAttributes->get($slug) ?? ProductAttribute::create([
+                    'shop_id' => $shopId,
+                    'name' => Str::title(str_replace(['_', '-'], ' ', $label)),
+                    'slug' => $slug,
+                    'type' => ProductAttribute::TYPE_SELECT,
+                    'is_filterable' => true,
+                    'sort_order' => (int) $shopAttributes->max('sort_order') + 1,
+                ]);
+                $shopAttributes->put($slug, $attribute);
+                $attributeColumns[$column] = $attribute;
+            } elseif ($attribute = $shopAttributes->get(Str::slug(str_replace('_', ' ', $column)))) {
+                $attributeColumns[$column] = $attribute;
+            }
+        }
+
+        $required = ['name', 'cost_price', 'selling_price'];
         foreach ($required as $col) {
             if (! in_array($col, $header, true)) {
                 return back()->withErrors([
@@ -759,9 +796,9 @@ class ProductController extends Controller
             $openingQty = (int) round($this->parseCsvNumber($data['stock_quantity'] ?? 0));
             $alertQty = (int) round($this->parseCsvNumber($data['alert_quantity'] ?? 5));
 
-            if ($name === '' || $barcode === '') {
+            if ($name === '') {
                 $skipped++;
-                $errors[] = "Row {$rowNum}: name and barcode are required.";
+                $errors[] = "Row {$rowNum}: name is required.";
                 continue;
             }
 
@@ -771,15 +808,18 @@ class ProductController extends Controller
                 continue;
             }
 
-            if (Product::where('barcode', $barcode)->exists()) {
+            if ($barcode !== '' && Product::where('barcode', $barcode)->exists()) {
                 $skipped++;
                 $errors[] = "Row {$rowNum}: barcode {$barcode} already exists — skipped.";
                 continue;
             }
+            if ($barcode === '') {
+                $barcode = $this->variants->generateCode();
+            }
 
             try {
                 DB::transaction(function () use (
-                    $shopId, $data, $name, $barcode, $cost, $sell, $openingQty, $alertQty, &$imported, &$stockSet
+                    $shopId, $data, $name, $barcode, $cost, $sell, $openingQty, $alertQty, $attributeColumns, &$imported, &$stockSet
                 ) {
                     $categoryId = null;
                     $categoryName = trim((string) ($data['category'] ?? ''));
@@ -821,11 +861,12 @@ class ProductController extends Controller
                         'barcode' => $barcode,
                         'sku' => filled($data['sku'] ?? null) ? trim((string) $data['sku']) : null,
                         'variant_group' => filled($data['variant_group'] ?? null) ? Str::slug((string) $data['variant_group']) : null,
-                        'color' => filled($data['color'] ?? null) ? trim((string) $data['color']) : null,
-                        'color_hex' => filled($data['color_hex'] ?? null) ? trim((string) $data['color_hex']) : null,
-                        'ram' => filled($data['ram'] ?? null) ? trim((string) $data['ram']) : null,
-                        'storage' => filled($data['storage'] ?? null) ? trim((string) $data['storage']) : null,
-                        'short_description' => filled($data['short_description'] ?? null) ? trim((string) $data['short_description']) : null,
+                        'short_description' => filled($data['short_description'] ?? null) ? Str::limit(trim((string) $data['short_description']), 500, '') : null,
+                        'description' => filled($data['description'] ?? null) ? trim((string) $data['description']) : null,
+                        'seo_title' => filled($data['seo_title'] ?? null) ? Str::limit(trim((string) $data['seo_title']), 255, '') : null,
+                        'meta_description' => filled($data['meta_description'] ?? null) ? Str::limit(trim((string) $data['meta_description']), 500, '') : null,
+                        'og_title' => filled($data['og_title'] ?? null) ? Str::limit(trim((string) $data['og_title']), 255, '') : null,
+                        'og_description' => filled($data['og_description'] ?? null) ? Str::limit(trim((string) $data['og_description']), 500, '') : null,
                         'cost_price' => $cost,
                         'selling_price' => $sell,
                         'stock_quantity' => 0,
@@ -833,6 +874,21 @@ class ProductController extends Controller
                         'is_published' => true,
                         'is_new_arrival' => true,
                     ]);
+
+                    $options = [];
+                    foreach ($attributeColumns as $column => $attribute) {
+                        $value = trim((string) ($data[$column] ?? ''));
+                        if ($value === '') {
+                            continue;
+                        }
+                        $options[$attribute->id] = [
+                            'value' => $value,
+                            'hex' => $attribute->isColor() && filled($data['color_hex'] ?? null) ? trim((string) $data['color_hex']) : null,
+                        ];
+                    }
+                    if ($options !== []) {
+                        $this->variants->syncValues($product, $options);
+                    }
 
                     $imageUrl = trim((string) ($data['image_url'] ?? ''));
                     if ($imageUrl !== '') {
@@ -968,7 +1024,7 @@ class ProductController extends Controller
 
     private function normalizeVariantFields(array $data): array
     {
-        foreach (['variant_group', 'color', 'color_hex', 'storage', 'ram', 'sku', 'short_description'] as $key) {
+        foreach (['variant_group', 'sku', 'short_description'] as $key) {
             if (array_key_exists($key, $data)) {
                 $val = is_string($data[$key]) ? trim($data[$key]) : $data[$key];
                 $data[$key] = ($val === '' || $val === null) ? null : $val;
@@ -979,19 +1035,6 @@ class ProductController extends Controller
             $data['variant_group'] = strtolower(preg_replace('/[^a-z0-9]+/i', '-', $data['variant_group']));
             $data['variant_group'] = trim($data['variant_group'], '-');
         }
-
-        if (! empty($data['color_hex']) && ! preg_match('/^#[0-9A-Fa-f]{6}$/', $data['color_hex'])) {
-            $data['color_hex'] = null;
-        }
-
-        if (array_key_exists('storage', $data) && is_string($data['storage'])) {
-            $data['storage'] = normalize_memory_size($data['storage']);
-        }
-        if (array_key_exists('ram', $data) && is_string($data['ram'])) {
-            $data['ram'] = normalize_memory_size($data['ram']);
-        }
-
-        unset($data['original_price'], $data['sale_price'], $data['sale_starts_at'], $data['sale_ends_at']);
 
         return $data;
     }
@@ -1182,7 +1225,7 @@ class ProductController extends Controller
 
         try {
             $response = Http::timeout(12)
-                ->withHeaders(['User-Agent' => 'MaksGadget-ProductImport/1.0'])
+                ->withHeaders(['User-Agent' => 'BynnasSocial-ProductImport/1.0'])
                 ->get($url);
 
             if (! $response->successful()) {

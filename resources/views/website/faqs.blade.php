@@ -24,7 +24,7 @@
         'headset' => 'M3 18v-6a9 9 0 0118 0v6M3 18a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3zm18 0a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h1a2 2 0 012 2v3z',
     ];
 @endphp
-@section('title', 'FAQ — '.($settings->store_name ?? config('app.name', 'Maks Gadget')))
+@section('title', 'FAQ — '.($settings->store_name ?? config('app.name', 'Bynnas Social')))
 @section('content')
 
 {{-- Hero --}}
@@ -161,7 +161,7 @@
 <section class="border-t border-slate-100 bg-slate-50/80">
     <div class="max-w-7xl mx-auto px-4 py-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
         @foreach([
-            ['title' => 'Fast Shipping', 'text' => 'Get your gadgets fast with our reliable shipping.', 'icon' => 'truck'],
+            ['title' => 'Fast Shipping', 'text' => 'Get your orders fast with our reliable shipping.', 'icon' => 'truck'],
             ['title' => 'Easy Returns', 'text' => '30-day easy returns on most products.', 'icon' => 'refresh'],
             ['title' => 'Secure Payments', 'text' => '100% secure payments with trusted methods.', 'icon' => 'shield'],
             ['title' => '24/7 Support', 'text' => 'Our support team is always here to help.', 'icon' => 'headset'],

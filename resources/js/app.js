@@ -8,7 +8,7 @@ window.Alpine = Alpine;
 
 function startAlpineWhenReady() {
     // Admin layout never defines storefrontCart — start immediately (no 2s delay / console error).
-    const isAdmin = document.body?.classList?.contains('admin-panel');
+    const isAdmin = document.body?.classList?.contains('admin-panel') || document.body?.hasAttribute('data-alpine-now');
     if (isAdmin || typeof window.storefrontCart === 'function') {
         Alpine.start();
         return;

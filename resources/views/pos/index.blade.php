@@ -1490,7 +1490,7 @@
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
                 @endif
             </span>
-            <span>{{ Auth::user()->shop->name ?? config('app.name', 'Maks Gadget') }} <em>POS</em></span>
+            <span>{{ Auth::user()->shop->name ?? config('app.name', 'Bynnas Social') }} <em>POS</em></span>
         </a>
 
         <div class="pos-chrome-search">
@@ -2661,7 +2661,7 @@ function posSystem() {
         darkMode: localStorage.getItem('nexa_dark') === 'true',
         isFullscreen: !!(document.fullscreenElement || document.webkitFullscreenElement),
         showFullscreenHint: localStorage.getItem('nexa_pos_fs_hint') !== 'dismissed',
-        shopName: @json(Auth::user()->shop->name ?? config('app.name', 'Maks Gadget')),
+        shopName: @json(Auth::user()->shop->name ?? config('app.name', 'Bynnas Social')),
         cashierName: @json(Auth::user()->name),
         offlinePendingTick: 0, // forces UI refresh of pending count
 

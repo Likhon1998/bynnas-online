@@ -1,31 +1,65 @@
 {{-- Shared product form fields — used by create & edit --}}
 @php
     $product = $product ?? null;
+    $variantOf = $variantOf ?? null;
+    $siblings = $siblings ?? collect();
     $isEdit = $product !== null;
-    $defaultVariants = old('variants', [
-        ['barcode' => '', 'color' => 'Black', 'color_hex' => '#1e293b', 'ram' => '', 'storage' => '', 'cost_price' => '', 'selling_price' => '', 'stock_quantity' => 10, 'imei_list' => ''],
-        ['barcode' => '', 'color' => 'White', 'color_hex' => '#f8fafc', 'ram' => '', 'storage' => '', 'cost_price' => '', 'selling_price' => '', 'stock_quantity' => 10, 'imei_list' => ''],
-        ['barcode' => '', 'color' => 'Red', 'color_hex' => '#dc2626', 'ram' => '', 'storage' => '', 'cost_price' => '', 'selling_price' => '', 'stock_quantity' => 5, 'imei_list' => ''],
-    ]);
+    $prefill = $product ?? $variantOf;
+    $showImei = retail_enabled() || (bool) ($product?->requires_imei);
+
+    $currentValues = $product
+        ? $product->variantValues->filter(fn ($v) => $v->attributeValue)->keyBy('product_attribute_id')
+        : collect();
+
+    $attributePayload = $productAttributes->map(fn ($a) => [
+        'id' => $a->id,
+        'name' => $a->name,
+        'type' => $a->type,
+        'values' => $a->values->map(fn ($v) => ['value' => $v->value, 'hex' => $v->swatchHex()])->values(),
+    ])->values();
+
+    $colorAttributeId = $productAttributes->firstWhere('slug', 'color')?->id;
+    $sizeAttributeId = $productAttributes->firstWhere('slug', 'size')?->id;
+
+    $oldVariants = collect(old('variants', []))->values()->map(function ($row, $i) {
+        return [
+            '_key' => 'v'.($i + 1),
+            'options' => (object) ($row['options'] ?? []),
+            'barcode' => $row['barcode'] ?? '',
+            'sku' => $row['sku'] ?? '',
+            'cost_price' => $row['cost_price'] ?? '',
+            'selling_price' => $row['selling_price'] ?? '',
+            'stock_quantity' => $row['stock_quantity'] ?? 0,
+            'imei_list' => $row['imei_list'] ?? '',
+            '_files' => [],
+        ];
+    });
+    $oldSelectedAttrs = collect(old('variants', []))
+        ->flatMap(fn ($row) => array_keys(array_filter($row['options'] ?? [], fn ($o) => filled($o['value'] ?? null))))
+        ->map(fn ($id) => (int) $id)->unique()->values();
+    $selectedAttrs = $oldSelectedAttrs->isNotEmpty()
+        ? $oldSelectedAttrs
+        : collect([$colorAttributeId, $sizeAttributeId])->filter()->values();
+
+    $defaultMode = $isEdit ? 'simple' : ($variantOf ? 'simple' : '');
 @endphp
 
 <div class="space-y-5"
      x-data="{
-        name: @js(old('name', $product?->name ?? '')),
-        color: @js(old('color', $product?->color ?? '')),
-        colorHex: @js(old('color_hex', $product?->color_hex ?: '#2563eb')),
-        storage: @js(old('storage', $product?->storage ?? '')),
-        ram: @js(old('ram', $product?->ram ?? '')),
-        variantGroup: @js(old('variant_group', $product?->variant_group ?? '')),
-        selling: @js(old('selling_price', $product?->selling_price ?? '')),
-        autoGroup: true,
-        productMode: @js(old('product_mode', $isEdit ? 'simple' : '')),
+        name: @js(old('name', $isEdit ? $product->name : ($variantOf?->storefrontDisplayName() ?? ''))),
+        variantGroup: @js(old('variant_group', $prefill?->variant_group ?? '')),
+        selling: @js(old('selling_price', $prefill?->selling_price ?? '')),
+        seoTitle: @js(old('seo_title', $prefill?->seo_title ?? '')),
+        metaDescription: @js(old('meta_description', $prefill?->meta_description ?? '')),
+        autoGroup: {{ ($isEdit || $variantOf) ? 'false' : 'true' }},
+        productMode: @js(old('product_mode', $defaultMode)),
         requiresImei: @js((bool) old('requires_imei', $product?->requires_imei ?? false)),
-        imeiText: @js(old('imei_list', ($isEdit && $product) ? $product->availableImeis()->pluck('imei')->implode("\n") : '')),
-        variantUid: {{ count($defaultVariants) }},
-        variants: @js(collect($defaultVariants)->values()->map(function ($row, $i) {
-            return array_merge($row, ['_key' => 'v'.($i + 1)]);
-        })->all()),
+        imeiText: @js(old('imei_list', ($isEdit && $product) ? $product->availableImeis->pluck('imei')->implode("\n") : '')),
+        attributes: @js($attributePayload),
+        selectedAttrs: @js($selectedAttrs),
+        genValues: {},
+        variantUid: {{ max(1, $oldVariants->count()) }},
+        variants: @js($oldVariants),
         categoryModal: false,
         brandModal: false,
         quickName: '',
@@ -34,43 +68,66 @@
         categoryUrl: @js(route('categories.store')),
         brandUrl: @js(route('brands.store')),
         csrf: @js(csrf_token()),
-        get hasMode() { return {{ $isEdit ? 'true' : 'false' }} || this.productMode === 'simple' || this.productMode === 'gadget'; },
-        get isMulti() { return this.productMode === 'gadget'; },
+        get hasMode() { return {{ $isEdit ? 'true' : 'false' }} || this.productMode === 'simple' || this.productMode === 'variable'; },
+        get isMulti() { return this.productMode === 'variable'; },
         get isSimple() { return this.productMode === 'simple' || {{ $isEdit ? 'true' : 'false' }}; },
+        get chosenAttributes() { return this.attributes.filter(a => this.selectedAttrs.includes(a.id)); },
         chooseMode(mode) {
             this.productMode = mode;
             this.syncGroup();
             this.$nextTick(() => document.getElementById('product_name_input')?.focus());
         },
         slugify(s) {
-            return String(s || '').toLowerCase().trim()
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/^-+|-+$/g, '')
-                .slice(0, 80);
+            return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
         },
         syncGroup() {
-            if (this.autoGroup && !@js($isEdit && filled($product?->variant_group))) {
-                this.variantGroup = this.slugify(this.name);
-            }
+            if (this.autoGroup) this.variantGroup = this.slugify(this.name);
         },
-        pickSwatch(hex, label) {
-            this.colorHex = hex;
-            if (!this.color) this.color = label;
+        toggleAttr(id) {
+            this.selectedAttrs = this.selectedAttrs.includes(id)
+                ? this.selectedAttrs.filter(x => x !== id)
+                : [...this.selectedAttrs, id];
+        },
+        hexFor(attr, value) {
+            const hit = (attr.values || []).find(v => v.value.toLowerCase() === String(value || '').toLowerCase());
+            return hit ? hit.hex : '#cbd5e1';
+        },
+        newRow(options = {}) {
+            this.variantUid++;
+            return {
+                _key: 'v' + this.variantUid, options, barcode: '', sku: '',
+                cost_price: '', selling_price: '', stock_quantity: 0, imei_list: '', _files: [],
+            };
         },
         addVariantRow() {
-            this.variantUid++;
-            this.variants.push({
-                _key: 'v' + this.variantUid,
-                barcode: '', color: '', color_hex: '#2563eb', ram: '', storage: '',
-                cost_price: '', selling_price: '', stock_quantity: 1, imei_list: '',
-                _files: [],
+            const options = {};
+            this.chosenAttributes.forEach(a => { options[a.id] = { value: '', hex: '#cbd5e1' }; });
+            this.variants.push(this.newRow(options));
+        },
+        generateVariants() {
+            const lists = this.chosenAttributes
+                .map(a => ({ attr: a, values: String(this.genValues[a.id] || '').split(',').map(v => v.trim()).filter(Boolean) }))
+                .filter(l => l.values.length);
+            if (!lists.length) return;
+            let combos = [{}];
+            lists.forEach(({ attr, values }) => {
+                const next = [];
+                combos.forEach(c => values.forEach(v => next.push({ ...c, [attr.id]: { value: v, hex: attr.type === 'color' ? this.hexFor(attr, v) : '' } })));
+                combos = next;
+            });
+            const key = (opts) => Object.keys(opts).sort().map(k => k + ':' + String(opts[k]?.value || '').toLowerCase()).join('|');
+            const existing = new Set(this.variants.map(r => key(r.options)));
+            combos.slice(0, 100).forEach(opts => {
+                if (!existing.has(key(opts))) this.variants.push(this.newRow(opts));
             });
         },
         removeVariantRow(i) {
-            if (this.variants.length <= 1) return;
             const row = this.variants[i];
             (row._files || []).forEach((f) => { if (f?.url) URL.revokeObjectURL(f.url); });
             this.variants.splice(i, 1);
+        },
+        rowLabel(row) {
+            return this.chosenAttributes.map(a => row.options?.[a.id]?.value).filter(Boolean).join(' / ') || 'New variant';
         },
         syncVariantFiles(index) {
             const row = this.variants[index];
@@ -112,83 +169,63 @@
             this.brandModal = true;
             this.$nextTick(() => this.$refs.quickBrandInput?.focus());
         },
-        async saveQuickCategory() {
+        async quickCreate(url, payload, selectId, key, fallback) {
             const name = (this.quickName || '').trim();
-            if (!name) { this.quickError = 'Enter a category name.'; return; }
+            if (!name) { this.quickError = 'Enter a name.'; return false; }
             this.quickLoading = true;
             this.quickError = '';
             try {
-                const res = await fetch(this.categoryUrl, {
+                const res = await fetch(url, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': this.csrf,
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                    body: JSON.stringify({ name }),
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': this.csrf, 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({ name, ...payload }),
                 });
                 const data = await res.json();
-                if (!res.ok) {
-                    this.quickError = data.errors?.name?.[0] || data.message || 'Could not create category.';
-                    return;
-                }
-                const select = document.getElementById('category_id');
+                if (!res.ok) { this.quickError = data.errors?.name?.[0] || data.message || fallback; return false; }
+                const select = document.getElementById(selectId);
                 const opt = document.createElement('option');
-                opt.value = data.category.id;
-                opt.textContent = data.category.name;
+                opt.value = data[key].id;
+                opt.textContent = data[key].name;
                 opt.selected = true;
                 select.appendChild(opt);
-                this.categoryModal = false;
+                return true;
             } catch (e) {
                 this.quickError = 'Network error. Please try again.';
+                return false;
             } finally {
                 this.quickLoading = false;
             }
         },
+        async saveQuickCategory() {
+            if (await this.quickCreate(this.categoryUrl, {}, 'category_id', 'category', 'Could not create category.')) this.categoryModal = false;
+        },
         async saveQuickBrand() {
-            const name = (this.quickName || '').trim();
-            if (!name) { this.quickError = 'Enter a brand name.'; return; }
-            this.quickLoading = true;
-            this.quickError = '';
-            try {
-                const res = await fetch(this.brandUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': this.csrf,
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                    body: JSON.stringify({ name, is_active: true }),
-                });
-                const data = await res.json();
-                if (!res.ok) {
-                    this.quickError = data.errors?.name?.[0] || data.message || 'Could not create brand.';
-                    return;
-                }
-                const select = document.getElementById('brand_id');
-                const opt = document.createElement('option');
-                opt.value = data.brand.id;
-                opt.textContent = data.brand.name;
-                opt.selected = true;
-                select.appendChild(opt);
-                this.brandModal = false;
-            } catch (e) {
-                this.quickError = 'Network error. Please try again.';
-            } finally {
-                this.quickLoading = false;
-            }
+            if (await this.quickCreate(this.brandUrl, { is_active: true }, 'brand_id', 'brand', 'Could not create brand.')) this.brandModal = false;
         },
      }"
      x-init="syncGroup()">
 
-    @if(!$isEdit)
-    {{-- Step 0: choose type first --}}
+    @foreach($productAttributes as $attribute)
+        <datalist id="attr-values-{{ $attribute->id }}">
+            @foreach($attribute->values as $value)
+                <option value="{{ $value->value }}">
+            @endforeach
+        </datalist>
+    @endforeach
+
+    @if($variantOf)
+        <input type="hidden" name="variant_of" value="{{ $variantOf->id }}">
+        <div class="rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm text-slate-700">
+            Adding a new variant to <strong>{{ $variantOf->storefrontDisplayName() }}</strong>.
+            Set its options below — they are added to the name automatically (e.g. “— Red / XL”).
+        </div>
+    @endif
+
+    @if(!$isEdit && !$variantOf)
     <section class="rounded-xl border border-slate-200 bg-white overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
-            <h3 class="text-sm font-semibold text-slate-800">1. What are you adding?</h3>
-            <p class="text-xs text-slate-500 mt-0.5">Choose first — the form below changes to match.</p>
+            <h3 class="text-sm font-semibold text-slate-800">What are you adding?</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Choose first — the form adapts to the product type.</p>
         </div>
         <div class="p-4">
             <input type="hidden" name="product_mode" :value="productMode">
@@ -201,25 +238,25 @@
                         <span x-show="productMode === 'simple'" class="h-2 w-2 rounded-full bg-white"></span>
                     </span>
                     <span>
-                        <span class="block text-sm font-bold text-slate-900">Single item</span>
-                        <span class="block text-[12px] text-slate-500 mt-1">One product, one barcode, one stock — e.g. one charger with no color options.</span>
+                        <span class="block text-sm font-bold text-slate-900">Single product</span>
+                        <span class="block text-[12px] text-slate-500 mt-1">One item, one price, one stock — e.g. a gift box, a toy, a bottle of serum.</span>
                     </span>
                 </button>
-                <button type="button" @click="chooseMode('gadget')"
+                <button type="button" @click="chooseMode('variable')"
                         class="text-left flex items-start gap-3 rounded-xl border p-4 transition"
-                        :class="productMode === 'gadget' ? 'border-orange-500 bg-orange-50/50 ring-2 ring-orange-200' : 'border-slate-200 hover:border-slate-300'">
+                        :class="productMode === 'variable' ? 'border-violet-500 bg-violet-50/50 ring-2 ring-violet-200' : 'border-slate-200 hover:border-slate-300'">
                     <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2"
-                          :class="productMode === 'gadget' ? 'border-orange-500 bg-orange-500' : 'border-slate-300'">
-                        <span x-show="productMode === 'gadget'" class="h-2 w-2 rounded-full bg-white"></span>
+                          :class="productMode === 'variable' ? 'border-violet-500 bg-violet-500' : 'border-slate-300'">
+                        <span x-show="productMode === 'variable'" class="h-2 w-2 rounded-full bg-white"></span>
                     </span>
                     <span>
-                        <span class="block text-sm font-bold text-slate-900">Multi-variant</span>
-                        <span class="block text-[12px] text-slate-500 mt-1">Same name, several colors/sizes (cable colors, phone memory…). Each has own barcode, stock &amp; photos.</span>
+                        <span class="block text-sm font-bold text-slate-900">Product with variants</span>
+                        <span class="block text-[12px] text-slate-500 mt-1">Same product in several options — sizes, colors, shades, materials, storage. Each variant has its own price, stock and photos.</span>
                     </span>
                 </button>
             </div>
             <p x-show="!hasMode" class="mt-3 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2" x-cloak>
-                Select Single item or Multi-variant to continue.
+                Select a product type to continue.
             </p>
         </div>
     </section>
@@ -229,12 +266,41 @@
 
     <div x-show="hasMode" x-cloak class="space-y-5">
 
-    {{-- Gallery: single item (or edit) only — multi uses photos per variant --}}
+    @if($isEdit && ($product->variant_group || $siblings->isNotEmpty()))
+    <section class="rounded-xl border border-slate-200 bg-white overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3">
+            <div>
+                <h3 class="text-sm font-semibold text-slate-800">Variants in this product</h3>
+                <p class="text-xs text-slate-500 mt-0.5">All variants share one storefront page. You are editing <strong>{{ $product->variantLabel() ?: 'this variant' }}</strong>.</p>
+            </div>
+            <a href="{{ route('products.create', ['variant_of' => $product->id]) }}"
+               class="shrink-0 inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100">
+                + Add variant
+            </a>
+        </div>
+        @if($siblings->isNotEmpty())
+            <div class="divide-y divide-slate-100">
+                @foreach($siblings as $sibling)
+                    <a href="{{ route('products.edit', $sibling) }}" class="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-slate-50">
+                        <span class="min-w-0">
+                            <span class="font-medium text-slate-800">{{ $sibling->variantLabel() ?: $sibling->name }}</span>
+                            <span class="ml-2 font-mono text-[11px] text-slate-400">{{ $sibling->barcode }}</span>
+                        </span>
+                        <span class="shrink-0 text-xs text-slate-500">
+                            {{ format_taka($sibling->selling_price) }} · {{ $sibling->availableStock() }} available
+                        </span>
+                    </a>
+                @endforeach
+            </div>
+        @endif
+    </section>
+    @endif
+
     <template x-if="isSimple">
     <section class="rounded-xl border border-slate-200 bg-white overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
-            <h3 class="text-sm font-semibold text-slate-800">{{ $isEdit ? '1' : '2' }}. Product gallery</h3>
-            <p class="text-xs text-slate-500 mt-0.5">Add as many photos as you want (up to 20). First photo is the main thumbnail.</p>
+            <h3 class="text-sm font-semibold text-slate-800">Photos</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Up to 20 photos. The first photo is the main thumbnail.@if($variantOf) Leave empty to reuse the photos of the original variant.@endif</p>
         </div>
         <div class="p-4">
             @include('products.partials.image-uploads', ['product' => $product ?? null])
@@ -242,23 +308,23 @@
     </section>
     </template>
 
-    {{-- Basic info --}}
     <section class="rounded-xl border border-slate-200 bg-white overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
-            <h3 class="text-sm font-semibold text-slate-800">{{ $isEdit ? '2' : '3' }}. Basic information</h3>
-            <p class="text-xs text-slate-500 mt-0.5">Title, brand, and category customers see on the store.</p>
+            <h3 class="text-sm font-semibold text-slate-800">Basic information</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Title, brand and category customers see on the store.</p>
         </div>
         <div class="p-4 space-y-4">
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1.5">Product name <span class="text-red-500">*</span></label>
-                <input type="text" id="product_name_input" name="name" x-model="name" @input="syncGroup()" value="{{ old('name', $product?->name ?? '') }}"
+                <input type="text" id="product_name_input" name="name" x-model="name" @input="syncGroup()"
                        :required="hasMode"
                        class="block w-full rounded-lg border-slate-200 bg-white focus:border-blue-500 focus:ring-blue-500 text-sm py-2.5"
-                       placeholder="e.g. USB-C Cable or Pixel 7">
+                       placeholder="e.g. Classic Cotton T-Shirt, Matte Lipstick, Wooden Puzzle Set">
+                <p class="text-[11px] text-slate-400 mt-1" x-show="isMulti" x-cloak>Each variant is saved as “Name — Option / Option”.</p>
                 @error('name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <div class="mb-1.5 flex items-center justify-between gap-2">
                         <label for="category_id" class="block text-xs font-semibold text-slate-600">Category</label>
@@ -271,7 +337,7 @@
                     <select id="category_id" name="category_id" class="block w-full rounded-lg border-slate-200 bg-white focus:border-blue-500 focus:ring-blue-500 text-sm py-2.5">
                         <option value="">Select category</option>
                         @foreach($categories as $category)
-                            <option value="{{ $category->id }}" {{ old('category_id', $product?->category_id ?? '') == $category->id ? 'selected' : '' }}>{{ $category->name }}</option>
+                            <option value="{{ $category->id }}" @selected(old('category_id', $prefill?->category_id ?? '') == $category->id)>{{ $category->name }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -287,81 +353,76 @@
                     <select id="brand_id" name="brand_id" class="block w-full rounded-lg border-slate-200 bg-white focus:border-blue-500 focus:ring-blue-500 text-sm py-2.5">
                         <option value="">No brand</option>
                         @foreach($brands as $brand)
-                            <option value="{{ $brand->id }}" {{ old('brand_id', $product?->brand_id ?? '') == $brand->id ? 'selected' : '' }}>{{ $brand->name }}</option>
+                            <option value="{{ $brand->id }}" @selected(old('brand_id', $prefill?->brand_id ?? '') == $brand->id)>{{ $brand->name }}</option>
                         @endforeach
                     </select>
                 </div>
-                <div x-show="isSimple">
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Barcode <span class="text-red-500">*</span></label>
-                    <input type="text" name="barcode" value="{{ old('barcode', $product?->barcode ?? '') }}"
-                           :required="isSimple"
-                           :disabled="isMulti"
-                           class="block w-full rounded-lg border-slate-200 bg-white focus:border-blue-500 focus:ring-blue-500 text-sm py-2.5 font-mono"
-                           placeholder="Unique barcode / product code…">
-                    <p class="text-[11px] text-slate-400 mt-1">Unique code for this item (like AGL7373).</p>
-                    @error('barcode') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
-                </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">SKU (optional)</label>
-                    <input type="text" name="sku" value="{{ old('sku', $product?->sku ?? '') }}"
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div x-show="isSimple">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Barcode / product code</label>
+                    <input type="text" name="barcode" value="{{ old('barcode', $product?->barcode ?? '') }}"
+                           :disabled="isMulti"
                            class="block w-full rounded-lg border-slate-200 bg-white focus:border-blue-500 focus:ring-blue-500 text-sm py-2.5 font-mono"
-                           placeholder="e.g. IPH15-256-NAT">
+                           placeholder="Auto-generated if empty">
+                    @error('barcode') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Availability (shop filter)</label>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">SKU</label>
+                    <input type="text" name="sku" value="{{ old('sku', $product?->sku ?? '') }}"
+                           class="block w-full rounded-lg border-slate-200 bg-white focus:border-blue-500 focus:ring-blue-500 text-sm py-2.5 font-mono"
+                           placeholder="Optional">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Availability label</label>
                     <select name="availability" class="block w-full rounded-lg border-slate-200 bg-white focus:border-blue-500 focus:ring-blue-500 text-sm py-2.5">
-                        @php $avail = old('availability', $product?->availability ?? 'in_stock'); @endphp
+                        @php $avail = old('availability', $prefill?->availability ?? 'in_stock'); @endphp
                         <option value="in_stock" @selected($avail === 'in_stock')>In Stock</option>
                         <option value="pre_order" @selected($avail === 'pre_order')>Pre Order</option>
-                        <option value="up_coming" @selected($avail === 'up_coming')>Up Coming</option>
+                        <option value="up_coming" @selected($avail === 'up_coming')>Coming Soon</option>
                         <option value="out_of_stock" @selected($avail === 'out_of_stock')>Out of Stock</option>
                     </select>
-                    <p class="text-[11px] text-slate-400 mt-1">Used by category sidebar filters on the website.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    {{-- Pricing --}}
     <section class="rounded-xl border border-slate-200 bg-white overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
-            <h3 class="text-sm font-semibold text-slate-800">{{ $isEdit ? '3' : '4' }}. Pricing</h3>
+            <h3 class="text-sm font-semibold text-slate-800">Pricing</h3>
             <p class="text-xs text-slate-500 mt-0.5">
-                <span x-show="isSimple">Cost &amp; selling price for this item.</span>
-                <span x-show="isMulti" x-cloak>Default price for all variants. You can override per color/option below.</span>
+                <span x-show="isSimple">Cost and selling price for this item.</span>
+                <span x-show="isMulti" x-cloak>Default price for every variant — override per variant below.</span>
             </p>
         </div>
         <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1.5">Cost price (Tk) <span class="text-red-500">*</span></label>
-                <input type="number" step="0.01" name="cost_price" value="{{ old('cost_price', $product?->cost_price ?? '') }}" required
+                <input type="number" step="0.01" min="0" name="cost_price" value="{{ old('cost_price', $prefill?->cost_price ?? '') }}" required
                        class="block w-full rounded-lg border-slate-200 text-sm py-2.5">
                 @error('cost_price') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
             </div>
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1.5">Selling price (Tk) <span class="text-red-500">*</span></label>
-                <input type="number" step="0.01" name="selling_price" x-model="selling" value="{{ old('selling_price', $product?->selling_price ?? '') }}" required
+                <input type="number" step="0.01" min="0" name="selling_price" x-model="selling" required
                        class="block w-full rounded-lg border-slate-200 text-sm py-2.5 font-medium text-blue-600">
                 @error('selling_price') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
             </div>
         </div>
         <div class="px-4 pb-4" x-data="{
-            dtype: @js(old('pos_discount_type', $product?->pos_discount_type ?? '')),
-            dval: @js(old('pos_discount_value', $product?->pos_discount_value ?? '')),
+            dtype: @js(old('pos_discount_type', $prefill?->pos_discount_type ?? '')),
+            dval: @js(old('pos_discount_value', $prefill?->pos_discount_value ?? '')),
         }">
             <div class="rounded-xl border border-rose-100 bg-rose-50/40 p-4 space-y-3">
                 <div>
-                    <p class="text-xs font-bold uppercase tracking-wide text-rose-700">Product discount (always on)</p>
-                    <p class="mt-0.5 text-[11px] text-slate-500">Applies on POS and storefront until you clear it. Timed Sale campaigns on the product list can still stack — customer pays the lower price.</p>
+                    <p class="text-xs font-bold uppercase tracking-wide text-rose-700">Always-on discount</p>
+                    <p class="mt-0.5 text-[11px] text-slate-500">Applies on the store until you clear it. Timed sales can still apply — the customer always pays the lower price.</p>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-600 mb-1">Type</label>
-                        <select name="pos_discount_type" x-model="dtype"
-                                class="block w-full rounded-lg border-slate-200 text-sm py-2.5">
+                        <select name="pos_discount_type" x-model="dtype" class="block w-full rounded-lg border-slate-200 text-sm py-2.5">
                             <option value="">No discount</option>
                             <option value="percent">Percent (%)</option>
                             <option value="fixed">Fixed (Tk)</option>
@@ -373,8 +434,7 @@
                             <span x-text="dtype === 'percent' ? 'Percent off' : 'Amount off (Tk)'"></span>
                         </label>
                         <input type="number" step="0.01" min="0" name="pos_discount_value" x-model="dval"
-                               :disabled="!dtype"
-                               :required="!!dtype"
+                               :disabled="!dtype" :required="!!dtype"
                                class="block w-full rounded-lg border-slate-200 text-sm py-2.5 disabled:bg-slate-100 disabled:text-slate-400">
                         @error('pos_discount_value') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
@@ -392,261 +452,261 @@
         </div>
     </section>
 
-    {{-- Variants --}}
-    <section class="rounded-xl border border-slate-200 bg-white overflow-hidden">
-        <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
-            <h3 class="text-sm font-semibold text-slate-800">{{ $isEdit ? '4' : '5' }}. Color / size options</h3>
-            <p class="text-xs text-slate-500 mt-0.5" x-show="isSimple">Optional color or size for this single item.</p>
-            <p class="text-xs text-slate-500 mt-0.5" x-show="isMulti" x-cloak>Add one row per color/option. Each needs a unique barcode and can have many pictures.</p>
+    {{-- Attributes for a single product / edited variant --}}
+    <section class="rounded-xl border border-slate-200 bg-white overflow-hidden" x-show="isSimple">
+        <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3">
+            <div>
+                <h3 class="text-sm font-semibold text-slate-800">Attributes</h3>
+                <p class="text-xs text-slate-500 mt-0.5">All optional. Used for store filters, the variant picker and order details.</p>
+            </div>
+            <a href="{{ route('attributes.index') }}" class="shrink-0 text-xs font-semibold text-blue-600 hover:underline">Manage attributes</a>
         </div>
-        <div class="p-4 space-y-4">
-            <div x-show="isMulti || {{ $isEdit ? 'true' : 'false' }}">
-                <div class="flex items-center justify-between gap-2 mb-1.5">
-                    <label class="text-xs font-semibold text-slate-600">Variant group key</label>
-                    <label class="text-[11px] text-slate-500 inline-flex items-center gap-1.5 cursor-pointer" x-show="!{{ $isEdit ? 'true' : 'false' }}">
-                        <input type="checkbox" x-model="autoGroup" @change="syncGroup()" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                        Auto from product name
-                    </label>
-                </div>
-                <input type="text" name="variant_group" x-model="variantGroup" @input="autoGroup = false"
-                       class="block w-full rounded-lg border-slate-200 text-sm py-2.5 font-mono"
-                       placeholder="e.g. usb-c-cable or pixel-7">
-                <p class="text-[11px] text-slate-400 mt-1" x-show="isMulti" x-cloak>
-                    Links all colors under one store page. Keep the same for every row below.
-                </p>
-            </div>
-            <div x-show="isSimple && !{{ $isEdit ? 'true' : 'false' }}" x-cloak>
-                <input type="hidden" name="variant_group" :value="variantGroup">
-            </div>
-
-            <div x-show="isSimple" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">Color name</label>
-                        <input type="text" name="color" x-model="color"
+        <div class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            @foreach($productAttributes as $attribute)
+                @php
+                    $current = $currentValues->get($attribute->id)?->attributeValue;
+                    $valueOld = old("attributes.{$attribute->id}.value", $current?->value ?? '');
+                    $hexOld = old("attributes.{$attribute->id}.hex", $current?->swatchHex() ?? '#cbd5e1');
+                @endphp
+                <div x-data="{ hex: @js($hexOld) }">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">{{ $attribute->name }}</label>
+                    <div class="flex items-center gap-2">
+                        <input type="text" name="attributes[{{ $attribute->id }}][value]" value="{{ $valueOld }}"
+                               list="attr-values-{{ $attribute->id }}"
                                class="block w-full rounded-lg border-slate-200 text-sm py-2.5"
-                               placeholder="e.g. Black">
-                        <div class="flex flex-wrap gap-2 mt-2.5">
-                            @foreach([
-                                ['#1e293b', 'Black'],
-                                ['#f8fafc', 'White'],
-                                ['#dc2626', 'Red'],
-                                ['#2563eb', 'Blue'],
-                                ['#c5c9a0', 'Lemongrass'],
-                                ['#16a34a', 'Green'],
-                                ['#ca8a04', 'Gold'],
-                            ] as [$hex, $label])
-                                <button type="button" @click="pickSwatch('{{ $hex }}', '{{ $label }}')"
-                                        title="{{ $label }}"
-                                        class="w-7 h-7 rounded-full border-2 border-white shadow ring-1 ring-slate-200 hover:ring-blue-400 transition"
-                                        style="background: {{ $hex }}"></button>
-                            @endforeach
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">Swatch color</label>
-                        <div class="flex items-center gap-3">
-                            <input type="color" x-model="colorHex"
-                                   class="h-10 w-14 rounded-lg border border-slate-200 cursor-pointer shrink-0">
-                            <input type="text" name="color_hex" x-model="colorHex"
-                                   class="flex-1 rounded-lg border-slate-200 text-sm py-2.5 font-mono"
-                                   placeholder="#2563eb">
-                            <div class="w-10 h-10 rounded-full border-2 border-blue-600 ring-2 ring-blue-100 shrink-0"
-                                 :style="'background:' + colorHex" title="Preview"></div>
-                        </div>
+                               placeholder="{{ $attribute->isColor() ? 'e.g. Black' : 'Optional' }}">
+                        @if($attribute->isColor())
+                            <input type="color" name="attributes[{{ $attribute->id }}][hex]" x-model="hex"
+                                   class="h-10 w-12 shrink-0 cursor-pointer rounded-lg border border-slate-200" title="Swatch color">
+                        @endif
                     </div>
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">Storage / size (optional)</label>
-                        <input type="text" name="storage" x-model="storage" list="storage-presets"
-                               class="block w-full rounded-lg border-slate-200 text-sm py-2.5"
-                               placeholder="e.g. 128GB or 2m">
-                        <datalist id="storage-presets">
-                            <option value="64GB"><option value="128GB"><option value="256GB"><option value="512GB"><option value="1TB">
-                        </datalist>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">RAM (optional)</label>
-                        <input type="text" name="ram" x-model="ram" list="ram-presets"
-                               class="block w-full rounded-lg border-slate-200 text-sm py-2.5"
-                               placeholder="e.g. 8GB">
-                        <datalist id="ram-presets">
-                            <option value="4GB"><option value="6GB"><option value="8GB"><option value="12GB"><option value="16GB">
-                        </datalist>
-                    </div>
-                </div>
-            </div>
-
-            @if(!$isEdit)
-            <div x-show="isMulti" x-cloak class="space-y-3">
-                <div class="flex items-center justify-between gap-2">
-                    <p class="text-xs font-semibold text-slate-700">Variants <span class="font-normal text-slate-500">(barcode + stock + photos each)</span></p>
-                    <button type="button" @click="addVariantRow()"
-                            class="text-xs font-semibold text-orange-700 hover:text-orange-800 px-2 py-1 rounded-md border border-orange-200 bg-orange-50">
-                        + Add color / option
-                    </button>
-                </div>
-                <template x-for="(row, index) in variants" :key="row._key">
-                    <div class="rounded-xl border border-slate-200 p-4 bg-slate-50/60 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide" x-text="'Option ' + (index + 1)"></span>
-                            <button type="button" @click="removeVariantRow(index)" x-show="variants.length > 1"
-                                    class="text-[11px] text-red-600 hover:text-red-700">Remove</button>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2">
-                            <div class="lg:col-span-2">
-                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Barcode *</label>
-                                <input type="text" :name="'variants['+index+'][barcode]'" x-model="row.barcode"
-                                       class="block w-full rounded-md border-slate-200 text-sm py-2 font-mono"
-                                       placeholder="e.g. CAB-BK-01">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Color</label>
-                                <input type="text" :name="'variants['+index+'][color]'" x-model="row.color"
-                                       class="block w-full rounded-md border-slate-200 text-sm py-2"
-                                       placeholder="Black">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Swatch</label>
-                                <input type="color" :name="'variants['+index+'][color_hex]'" x-model="row.color_hex"
-                                       class="h-9 w-full rounded-md border border-slate-200 cursor-pointer">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">RAM</label>
-                                <input type="text" :name="'variants['+index+'][ram]'" x-model="row.ram"
-                                       class="block w-full rounded-md border-slate-200 text-sm py-2" placeholder="optional">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Storage</label>
-                                <input type="text" :name="'variants['+index+'][storage]'" x-model="row.storage"
-                                       class="block w-full rounded-md border-slate-200 text-sm py-2" placeholder="optional">
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <div>
-                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Cost (Tk)</label>
-                                <input type="number" step="0.01" min="0" :name="'variants['+index+'][cost_price]'" x-model="row.cost_price"
-                                       class="block w-full rounded-md border-slate-200 text-sm py-2"
-                                       placeholder="Same as default">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Selling (Tk)</label>
-                                <input type="number" step="0.01" min="0" :name="'variants['+index+'][selling_price]'" x-model="row.selling_price"
-                                       class="block w-full rounded-md border-slate-200 text-sm py-2 font-medium text-blue-700"
-                                       :placeholder="selling ? ('Default Tk ' + selling) : 'Same as default'">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-semibold text-slate-500 mb-1">Opening qty</label>
-                                <input type="number" min="0" :name="'variants['+index+'][stock_quantity]'" x-model="row.stock_quantity"
-                                       class="block w-full rounded-md border-slate-200 text-sm py-2">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-semibold text-slate-500 mb-1.5">Pictures for this color (add as many as you want)</label>
-                            @include('products.partials.variant-image-uploads')
-                        </div>
-                        <div x-show="requiresImei">
-                            <label class="block text-[10px] font-semibold text-slate-500 mb-1">IMEI numbers (one per line)</label>
-                            <textarea :name="'variants['+index+'][imei_list]'" x-model="row.imei_list" rows="2"
-                                      class="block w-full rounded-md border-slate-200 text-sm font-mono"
-                                      placeholder="356938035643809&#10;356938035643810"></textarea>
-                        </div>
-                    </div>
-                </template>
-                @error('variants') <p class="text-red-500 text-xs">{{ $message }}</p> @enderror
-                @error('variants.*.barcode') <p class="text-red-500 text-xs">{{ $message }}</p> @enderror
-            </div>
-            @endif
+            @endforeach
         </div>
+        <div class="px-4 pb-4" x-show="{{ $isEdit ? 'true' : 'false' }}">
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Product family key</label>
+            <input type="text" name="variant_group" x-model="variantGroup"
+                   class="block w-full rounded-lg border-slate-200 text-sm py-2.5 font-mono"
+                   placeholder="e.g. classic-cotton-tshirt">
+            <p class="text-[11px] text-slate-400 mt-1">Variants with the same key share one store page and a variant picker.</p>
+        </div>
+        @if(!$isEdit)
+            <input type="hidden" name="variant_group" :value="variantGroup" :disabled="isMulti">
+        @endif
     </section>
 
-    {{-- IMEI --}}
+    {{-- Variant builder --}}
+    @if(!$isEdit)
+    <section class="rounded-xl border border-slate-200 bg-white overflow-hidden" x-show="isMulti" x-cloak>
+        <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3">
+            <div>
+                <h3 class="text-sm font-semibold text-slate-800">Variants</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Pick the attributes that change, list their values, then generate every combination.</p>
+            </div>
+            <a href="{{ route('attributes.index') }}" class="shrink-0 text-xs font-semibold text-blue-600 hover:underline">Manage attributes</a>
+        </div>
+        <div class="p-4 space-y-4">
+            <input type="hidden" name="variant_group" :value="variantGroup" :disabled="!isMulti">
+
+            <div>
+                <p class="text-xs font-semibold text-slate-600 mb-2">1. Which attributes change between variants?</p>
+                <div class="flex flex-wrap gap-2">
+                    <template x-for="attr in attributes" :key="attr.id">
+                        <button type="button" @click="toggleAttr(attr.id)"
+                                class="rounded-full border px-3 py-1.5 text-xs font-semibold transition"
+                                :class="selectedAttrs.includes(attr.id) ? 'border-violet-500 bg-violet-50 text-violet-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'"
+                                x-text="attr.name"></button>
+                    </template>
+                </div>
+            </div>
+
+            <div x-show="chosenAttributes.length" class="space-y-2">
+                <p class="text-xs font-semibold text-slate-600">2. Values (comma separated)</p>
+                <template x-for="attr in chosenAttributes" :key="'gen-' + attr.id">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <span class="w-28 shrink-0 text-xs font-medium text-slate-500" x-text="attr.name"></span>
+                        <input type="text" x-model="genValues[attr.id]"
+                               class="block w-full rounded-lg border-slate-200 text-sm py-2"
+                               :placeholder="attr.values.length ? attr.values.slice(0, 4).map(v => v.value).join(', ') : 'e.g. S, M, L, XL'">
+                    </div>
+                </template>
+                <div class="flex flex-wrap gap-2 pt-1">
+                    <button type="button" @click="generateVariants()"
+                            class="rounded-lg bg-violet-600 px-3 py-2 text-xs font-bold text-white hover:bg-violet-700">Generate variants</button>
+                    <button type="button" @click="addVariantRow()"
+                            class="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">+ Add one manually</button>
+                </div>
+            </div>
+
+            <p x-show="!variants.length" class="rounded-lg border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-500">
+                No variants yet — generate them above.
+            </p>
+
+            <template x-for="(row, index) in variants" :key="row._key">
+                <div class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-bold text-slate-700" x-text="rowLabel(row)"></span>
+                        <button type="button" @click="removeVariantRow(index)" class="text-[11px] font-medium text-red-600 hover:text-red-700">Remove</button>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                        <template x-for="attr in chosenAttributes" :key="row._key + '-' + attr.id">
+                            <div>
+                                <label class="block text-[10px] font-semibold text-slate-500 mb-1" x-text="attr.name"></label>
+                                <div class="flex items-center gap-1.5">
+                                    <input type="text"
+                                           :name="'variants[' + index + '][options][' + attr.id + '][value]'"
+                                           :list="'attr-values-' + attr.id"
+                                           :value="row.options?.[attr.id]?.value || ''"
+                                           @input="row.options = { ...row.options, [attr.id]: { ...(row.options?.[attr.id] || {}), value: $event.target.value } }"
+                                           class="block w-full rounded-md border-slate-200 text-sm py-2">
+                                    <template x-if="attr.type === 'color'">
+                                        <input type="color"
+                                               :name="'variants[' + index + '][options][' + attr.id + '][hex]'"
+                                               :value="row.options?.[attr.id]?.hex || hexFor(attr, row.options?.[attr.id]?.value)"
+                                               class="h-9 w-10 shrink-0 cursor-pointer rounded-md border border-slate-200">
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="grid grid-cols-2 lg:grid-cols-5 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-semibold text-slate-500 mb-1">Cost (Tk)</label>
+                            <input type="number" step="0.01" min="0" :name="'variants[' + index + '][cost_price]'" x-model="row.cost_price"
+                                   class="block w-full rounded-md border-slate-200 text-sm py-2" placeholder="Default">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-semibold text-slate-500 mb-1">Selling (Tk)</label>
+                            <input type="number" step="0.01" min="0" :name="'variants[' + index + '][selling_price]'" x-model="row.selling_price"
+                                   class="block w-full rounded-md border-slate-200 text-sm py-2 font-medium text-blue-700"
+                                   :placeholder="selling ? ('Tk ' + selling) : 'Default'">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-semibold text-slate-500 mb-1">Opening qty</label>
+                            <input type="number" min="0" :name="'variants[' + index + '][stock_quantity]'" x-model="row.stock_quantity"
+                                   class="block w-full rounded-md border-slate-200 text-sm py-2">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-semibold text-slate-500 mb-1">Barcode</label>
+                            <input type="text" :name="'variants[' + index + '][barcode]'" x-model="row.barcode"
+                                   class="block w-full rounded-md border-slate-200 text-sm py-2 font-mono" placeholder="Auto">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-semibold text-slate-500 mb-1">SKU</label>
+                            <input type="text" :name="'variants[' + index + '][sku]'" x-model="row.sku"
+                                   class="block w-full rounded-md border-slate-200 text-sm py-2 font-mono" placeholder="Optional">
+                        </div>
+                    </div>
+                    <details class="group">
+                        <summary class="cursor-pointer text-[11px] font-semibold text-slate-500 hover:text-slate-700">Photos for this variant <span x-text="(row._files || []).length ? '(' + row._files.length + ')' : '(optional — reuses the previous variant\'s photos)'"></span></summary>
+                        <div class="mt-2">
+                            @include('products.partials.variant-image-uploads')
+                        </div>
+                    </details>
+                    @if($showImei)
+                        <div x-show="requiresImei">
+                            <label class="block text-[10px] font-semibold text-slate-500 mb-1">IMEI / serial numbers (one per line)</label>
+                            <textarea :name="'variants[' + index + '][imei_list]'" x-model="row.imei_list" rows="2"
+                                      class="block w-full rounded-md border-slate-200 text-sm font-mono"></textarea>
+                        </div>
+                    @endif
+                </div>
+            </template>
+            @error('variants') <p class="text-red-500 text-xs">{{ $message }}</p> @enderror
+            @error('variants.*.barcode') <p class="text-red-500 text-xs">{{ $message }}</p> @enderror
+
+            <template x-if="isMulti">
+                <div class="rounded-lg border border-dashed border-slate-200 bg-white p-3">
+                    <p class="text-[11px] font-semibold text-slate-600 mb-2">Shared photos (used for the first variant if it has none of its own)</p>
+                    @include('products.partials.image-uploads', ['product' => null])
+                </div>
+            </template>
+        </div>
+    </section>
+    @endif
+
+    @if($showImei)
     <section class="rounded-xl border border-slate-200 bg-white overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
-            <h3 class="text-sm font-semibold text-slate-800">{{ $isEdit ? '4b' : '6' }}. IMEI tracking (optional)</h3>
-            <p class="text-xs text-slate-500 mt-0.5">Only for phones. Leave off for cables &amp; accessories.</p>
+            <h3 class="text-sm font-semibold text-slate-800">Serial / IMEI tracking</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Legacy retail feature — only for items sold with a serial number.</p>
         </div>
         <div class="p-4 space-y-3">
             <label class="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                 <input type="hidden" name="requires_imei" value="0">
                 <input type="checkbox" name="requires_imei" value="1" x-model="requiresImei"
                        class="rounded border-slate-300 text-orange-600 focus:ring-orange-500">
-                This product requires an IMEI / serial when selling
+                Require an IMEI / serial when selling
             </label>
             <div x-show="requiresImei && isSimple" x-cloak>
-                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Available IMEI list (one per line)</label>
-                <textarea name="imei_list" x-model="imeiText" rows="4"
-                          class="block w-full rounded-lg border-slate-200 text-sm font-mono"
-                          placeholder="356938035643809&#10;356938035643810"></textarea>
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Available serials (one per line)</label>
+                <textarea name="imei_list" x-model="imeiText" rows="4" class="block w-full rounded-lg border-slate-200 text-sm font-mono"></textarea>
                 @error('imei_list') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
             </div>
-            <p class="text-[11px] text-slate-500" x-show="requiresImei && isMulti" x-cloak>
-                Enter IMEIs on each variant row above.
-            </p>
         </div>
     </section>
+    @endif
 
-    {{-- 5. Store description --}}    {{-- 5. Store description --}}
     <section class="rounded-xl border border-slate-200 bg-white overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
-            <h3 class="text-sm font-semibold text-slate-800">5. Store description & visibility</h3>
-            <p class="text-xs text-slate-500 mt-0.5">Shown under Description on the product page.</p>
+            <h3 class="text-sm font-semibold text-slate-800">Description &amp; visibility</h3>
+            <p class="text-xs text-slate-500 mt-0.5">The short summary appears near the price; the full description appears under the Description tab.</p>
         </div>
         <div class="p-4 space-y-4">
             <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Short description</label>
-                <textarea name="short_description" rows="4"
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Short summary</label>
+                <textarea name="short_description" rows="2" maxlength="2000"
                           class="block w-full rounded-lg border-slate-200 text-sm"
-                          placeholder="About this item — features, condition, what’s included…">{{ old('short_description', $product?->short_description ?? '') }}</textarea>
+                          placeholder="One or two lines that sell the product.">{{ old('short_description', $prefill?->short_description ?? '') }}</textarea>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Full description</label>
+                <textarea name="description" rows="6"
+                          class="block w-full rounded-lg border-slate-200 text-sm"
+                          placeholder="Features, materials, sizing guide, care instructions, what’s in the box…">{{ old('description', $prefill?->description ?? '') }}</textarea>
             </div>
 
             <div class="flex flex-wrap gap-4">
                 <label class="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                     <input type="checkbox" name="is_published" value="1" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                           {{ old('is_published', $isEdit ? ($product?->is_published ?? true) : true) ? 'checked' : '' }}>
+                           @checked(old('is_published', $isEdit ? ($product?->is_published ?? true) : true))>
                     Publish on website
                 </label>
                 <label class="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                     <input type="checkbox" name="is_new_arrival" value="1" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                           {{ old('is_new_arrival', $product?->is_new_arrival ?? false) ? 'checked' : '' }}>
+                           @checked(old('is_new_arrival', $prefill?->is_new_arrival ?? false))>
                     New Arrival
                 </label>
                 <label class="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                     <input type="checkbox" name="is_best_seller" value="1" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                           {{ old('is_best_seller', $product?->is_best_seller ?? false) ? 'checked' : '' }}>
+                           @checked(old('is_best_seller', $prefill?->is_best_seller ?? false))>
                     Trending
                 </label>
                 <label class="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                     <input type="checkbox" name="is_featured" value="1" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                           {{ old('is_featured', $product?->is_featured ?? false) ? 'checked' : '' }}>
+                           @checked(old('is_featured', $prefill?->is_featured ?? false))>
                     Featured
                 </label>
             </div>
-            <p class="text-[11px] text-slate-400">New Arrival and Trending control which products appear in those homepage sections.</p>
 
             @if(!$isEdit)
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" x-show="isSimple">
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1.5">Opening quantity</label>
-                        <input type="number" name="stock_quantity" min="0" step="1"
-                               value="{{ old('stock_quantity', 0) }}"
+                        <input type="number" name="stock_quantity" min="0" step="1" value="{{ old('stock_quantity', 0) }}"
                                :disabled="isMulti"
-                               class="block w-full rounded-lg border-slate-200 text-sm py-2.5"
-                               placeholder="e.g. 10">
+                               class="block w-full rounded-lg border-slate-200 text-sm py-2.5">
                         @error('stock_quantity') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1.5">Low stock alert</label>
                         <input type="number" name="alert_quantity" value="{{ old('alert_quantity', 5) }}" min="0"
                                :disabled="isMulti"
-                               :required="isSimple"
                                class="block w-full rounded-lg border-slate-200 text-sm py-2.5">
                     </div>
                 </div>
-                <div x-show="isMulti" x-cloak class="rounded-lg border border-orange-100 bg-orange-50/50 px-3 py-2.5 text-xs text-slate-600">
-                    Opening stock is set <strong>per color/option</strong> above. Shared low-stock alert:
+                <div x-show="isMulti" x-cloak class="rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2.5 text-xs text-slate-600">
+                    Opening stock is set per variant. Low stock alert for each variant:
                     <input type="number" name="alert_quantity" value="{{ old('alert_quantity', 5) }}" min="0"
                            :disabled="!isMulti"
                            class="inline-block w-20 ml-1 rounded border-slate-200 text-sm py-1">
@@ -654,22 +714,21 @@
             @else
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">Current stock</label>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">Stock</label>
                         <div class="block w-full rounded-lg border border-slate-200 bg-slate-50 text-sm py-2.5 px-3 font-medium text-slate-900">
-                            {{ $product?->stock_quantity ?? 0 }} units
+                            {{ $product->stock_quantity ?? 0 }} on hand · {{ $product->reservedStock() }} reserved · {{ $product->availableStock() }} available
                         </div>
                         <p class="text-[11px] text-slate-400 mt-1">
                             Change stock via
-                            @if(($product?->stock_quantity ?? 0) === 0)
-                                <a href="{{ route('supply.opening-inventory.index') }}" class="text-blue-600 underline">Opening Inventory</a>
-                                or
+                            @if(($product->stock_quantity ?? 0) === 0)
+                                <a href="{{ route('supply.opening-inventory.index') }}" class="text-blue-600 underline">Opening Inventory</a> or
                             @endif
                             <a href="{{ route('supply.adjustments.index') }}" class="text-blue-600 underline">Stock Adjustment</a>.
                         </p>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1.5">Low stock alert</label>
-                        <input type="number" name="alert_quantity" value="{{ old('alert_quantity', $product?->alert_quantity ?? 5) }}" required min="0"
+                        <input type="number" name="alert_quantity" value="{{ old('alert_quantity', $product->alert_quantity ?? 5) }}" min="0"
                                class="block w-full rounded-lg border-slate-200 text-sm py-2.5">
                     </div>
                 </div>
@@ -677,9 +736,63 @@
         </div>
     </section>
 
+    <section class="rounded-xl border border-slate-200 bg-white overflow-hidden" x-data="{ open: {{ ($product?->seo_title || $product?->meta_description || $product?->og_image || $errors->hasAny(['seo_title', 'meta_description', 'og_title', 'og_description', 'og_image_file'])) ? 'true' : 'false' }} }">
+        <button type="button" @click="open = !open" class="w-full px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3 text-left">
+            <span>
+                <span class="block text-sm font-semibold text-slate-800">SEO &amp; social sharing</span>
+                <span class="block text-xs text-slate-500 mt-0.5">How this product looks on Google and when shared on Facebook, WhatsApp or Messenger.</span>
+            </span>
+            <svg class="h-4 w-4 shrink-0 text-slate-400 transition" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div class="p-4 space-y-4" x-show="open" x-cloak>
+            <div class="rounded-lg border border-slate-200 bg-white p-3">
+                <p class="text-[11px] text-slate-400">Search preview</p>
+                <p class="mt-1 truncate text-[15px] font-medium text-blue-700" x-text="seoTitle || name || 'Product title'"></p>
+                <p class="truncate text-[11px] text-emerald-700">{{ url('/product') }}/…</p>
+                <p class="mt-0.5 line-clamp-2 text-xs text-slate-600" x-text="metaDescription || 'Add a meta description to control the text shown under the title.'"></p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">SEO title <span class="font-normal text-slate-400" x-text="'(' + (seoTitle || '').length + '/60)'"></span></label>
+                    <input type="text" name="seo_title" x-model="seoTitle" maxlength="255"
+                           class="block w-full rounded-lg border-slate-200 text-sm py-2.5" placeholder="Defaults to the product name">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Meta description <span class="font-normal text-slate-400" x-text="'(' + (metaDescription || '').length + '/160)'"></span></label>
+                    <textarea name="meta_description" x-model="metaDescription" rows="2" maxlength="500"
+                              class="block w-full rounded-lg border-slate-200 text-sm" placeholder="Defaults to the short summary"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Social share title (OG)</label>
+                    <input type="text" name="og_title" value="{{ old('og_title', $prefill?->og_title ?? '') }}" maxlength="255"
+                           class="block w-full rounded-lg border-slate-200 text-sm py-2.5" placeholder="Defaults to the SEO title">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Social share description (OG)</label>
+                    <textarea name="og_description" rows="2" maxlength="500"
+                              class="block w-full rounded-lg border-slate-200 text-sm" placeholder="Defaults to the meta description">{{ old('og_description', $prefill?->og_description ?? '') }}</textarea>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Social share image (OG)</label>
+                <div class="flex flex-wrap items-center gap-3">
+                    @if($product?->og_image)
+                        <img src="{{ public_storage_url($product->og_image) }}" alt="" class="h-16 w-28 rounded-lg border border-slate-200 object-cover">
+                        <label class="inline-flex items-center gap-1.5 text-xs text-slate-600">
+                            <input type="checkbox" name="remove_og_image" value="1" class="rounded border-slate-300 text-rose-600"> Remove
+                        </label>
+                    @endif
+                    <input type="file" name="og_image_file" accept="image/jpeg,image/png,image/webp"
+                           class="text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold">
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">1200×630 recommended. Defaults to the main product photo.</p>
+                @error('og_image_file') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+            </div>
+        </div>
+    </section>
+
     </div>{{-- /hasMode --}}
 
-    {{-- Quick add category modal --}}
     <div x-show="categoryModal" x-cloak class="fixed inset-0 z-[80] flex items-center justify-center p-4" @keydown.escape.window="categoryModal = false">
         <div class="absolute inset-0 bg-slate-900/40" @click="categoryModal = false"></div>
         <div class="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl" @click.stop>
@@ -694,7 +807,7 @@
             </div>
             <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Category name</label>
             <input type="text" x-ref="quickCategoryInput" x-model="quickName" @keydown.enter.prevent="saveQuickCategory()"
-                   placeholder="e.g. Phones"
+                   placeholder="e.g. Skincare"
                    class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-blue-400 focus:ring-blue-100">
             <p x-show="quickError" x-text="quickError" class="mt-2 text-[12px] font-medium text-rose-600"></p>
             <div class="mt-5 flex justify-end gap-2">
@@ -707,7 +820,6 @@
         </div>
     </div>
 
-    {{-- Quick add brand modal --}}
     <div x-show="brandModal" x-cloak class="fixed inset-0 z-[80] flex items-center justify-center p-4" @keydown.escape.window="brandModal = false">
         <div class="absolute inset-0 bg-slate-900/40" @click="brandModal = false"></div>
         <div class="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl" @click.stop>
@@ -722,7 +834,7 @@
             </div>
             <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Brand name</label>
             <input type="text" x-ref="quickBrandInput" x-model="quickName" @keydown.enter.prevent="saveQuickBrand()"
-                   placeholder="e.g. Apple"
+                   placeholder="e.g. Aarong"
                    class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-blue-400 focus:ring-blue-100">
             <p x-show="quickError" x-text="quickError" class="mt-2 text-[12px] font-medium text-rose-600"></p>
             <div class="mt-5 flex justify-end gap-2">

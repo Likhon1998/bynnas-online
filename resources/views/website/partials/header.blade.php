@@ -1,5 +1,5 @@
 @php
-    $headerName = $settings->store_name ?? config('app.name', 'Maks Gadget');
+    $headerName = $settings->store_name ?? config('app.name', 'Bynnas Social');
     $headerIconPath = $settings->favicon_path ?: $settings->logo_path;
     $headerIcon = $headerIconPath ? public_storage_url($headerIconPath) : null;
     $headerIconVer = $headerIconPath

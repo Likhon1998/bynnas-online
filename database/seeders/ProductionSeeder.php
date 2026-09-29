@@ -18,9 +18,9 @@ class ProductionSeeder extends Seeder
         $this->call(RolesAndPermissionsSeeder::class);
 
         $shop = Shop::updateOrCreate(
-            ['email' => env('ADMIN_EMAIL', 'admin@maksgadget.com')],
+            ['email' => env('ADMIN_EMAIL', 'admin@bynnas.com')],
             [
-                'name' => env('SHOP_NAME', 'Maks Gadget'),
+                'name' => env('SHOP_NAME', 'Bynnas Social'),
                 'phone' => null,
                 'address' => null,
                 'is_active' => true,
@@ -30,7 +30,7 @@ class ProductionSeeder extends Seeder
         $password = env('ADMIN_PASSWORD', '12345678');
 
         $admin = User::updateOrCreate(
-            ['email' => env('ADMIN_EMAIL', 'admin@maksgadget.com')],
+            ['email' => env('ADMIN_EMAIL', 'admin@bynnas.com')],
             [
                 'shop_id' => $shop->id,
                 'role' => 'admin',
@@ -46,7 +46,7 @@ class ProductionSeeder extends Seeder
         $settings = SiteSetting::query()->first() ?? new SiteSetting;
         $settings->fill([
             'default_shop_id' => $shop->id,
-            'store_name' => env('SHOP_NAME', 'Maks Gadget'),
+            'store_name' => env('SHOP_NAME', 'Bynnas Social'),
             'currency_code' => 'BDT',
             'currency_symbol' => '৳',
             'special_offer_text' => null,

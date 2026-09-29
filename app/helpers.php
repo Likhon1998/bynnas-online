@@ -15,6 +15,26 @@ if (! function_exists('retail_enabled')) {
     }
 }
 
+if (! function_exists('color_name_to_hex')) {
+    /** Best-guess swatch colour for a colour name; neutral grey when unknown. */
+    function color_name_to_hex(?string $name): string
+    {
+        $map = [
+            'red' => '#dc2626', 'maroon' => '#7f1d1d', 'blue' => '#2563eb', 'navy' => '#1e3a8a',
+            'sky blue' => '#38bdf8', 'black' => '#1e293b', 'white' => '#f8fafc', 'off white' => '#f5f5f0',
+            'cream' => '#fdf6e3', 'beige' => '#e7d8c0', 'brown' => '#7c4a2d', 'green' => '#16a34a',
+            'olive' => '#65743a', 'mint' => '#6ee7b7', 'gold' => '#ca8a04', 'silver' => '#94a3b8',
+            'gray' => '#64748b', 'grey' => '#64748b', 'pink' => '#ec4899', 'rose' => '#f43f5e',
+            'nude' => '#d8a48f', 'purple' => '#9333ea', 'lavender' => '#c4b5fd', 'orange' => '#ea580c',
+            'peach' => '#fdba74', 'yellow' => '#eab308', 'teal' => '#0d9488', 'multicolor' => '#a855f7',
+            'natural titanium' => '#d4cfc8', 'phantom black' => '#2d2d2d', 'white titanium' => '#e8e6e3',
+            'blue titanium' => '#5b7a9d', 'black titanium' => '#3a3a3a',
+        ];
+
+        return $map[strtolower(trim((string) $name))] ?? '#cbd5e1';
+    }
+}
+
 if (! function_exists('format_taka_number')) {
     /**
      * Round money to whole taka (no poysa / .00). Use for all currency display.
@@ -191,45 +211,6 @@ if (! function_exists('memory_size_compact')) {
         $normalized = normalize_memory_size($value);
 
         return $normalized ? strtolower(str_replace(' ', '', $normalized)) : '';
-    }
-}
-
-if (! function_exists('memory_size_sort_key')) {
-    /** Sort key in megabytes for numeric ordering. */
-    function memory_size_sort_key(?string $value): float
-    {
-        $normalized = normalize_memory_size($value);
-        if (! $normalized || ! preg_match('/^(\d+(?:\.\d+)?)\s*(TB|GB|MB|KB)$/', $normalized, $m)) {
-            return PHP_FLOAT_MAX;
-        }
-
-        $n = (float) $m[1];
-
-        return match ($m[2]) {
-            'TB' => $n * 1024 * 1024,
-            'GB' => $n * 1024,
-            'MB' => $n,
-            'KB' => $n / 1024,
-            default => PHP_FLOAT_MAX,
-        };
-    }
-}
-
-if (! function_exists('unique_memory_sizes')) {
-    /**
-     * Deduplicate and sort memory labels (RAM / ROM).
-     *
-     * @param  iterable<int, mixed>  $values
-     * @return \Illuminate\Support\Collection<int, string>
-     */
-    function unique_memory_sizes(iterable $values): \Illuminate\Support\Collection
-    {
-        return collect($values)
-            ->map(fn ($v) => normalize_memory_size(is_string($v) ? $v : (string) $v))
-            ->filter()
-            ->unique(fn ($v) => memory_size_compact($v))
-            ->sortBy(fn ($v) => memory_size_sort_key($v))
-            ->values();
     }
 }
 

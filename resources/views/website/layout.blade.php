@@ -61,7 +61,22 @@
             };
         })();
     </script>
-    <title>@yield('title', $settings->store_name ?? config('app.name', 'Maks Gadget'))</title>
+    <title>@yield('title', $settings->store_name ?? config('app.name', 'Bynnas Social'))</title>
+    @hasSection('meta')
+        @yield('meta')
+    @else
+        @php $defaultMetaDescription = \Illuminate\Support\Str::limit((string) ($settings->footer_tagline ?? ''), 160, '…'); @endphp
+        @if($defaultMetaDescription !== '')
+            <meta name="description" content="{{ $defaultMetaDescription }}">
+        @endif
+        <meta property="og:type" content="website">
+        <meta property="og:site_name" content="{{ $settings->store_name ?? config('app.name') }}">
+        <meta property="og:title" content="@yield('title', $settings->store_name ?? config('app.name', 'Bynnas Social'))">
+        <meta property="og:url" content="{{ url()->current() }}">
+        @if($defaultMetaDescription !== '')
+            <meta property="og:description" content="{{ $defaultMetaDescription }}">
+        @endif
+    @endif
     @include('partials.favicon', ['settings' => $settings ?? null])
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet" />
@@ -786,9 +801,9 @@
     <div class="gaget-page-loader__inner">
         <div class="gaget-page-loader__mark" aria-hidden="true">
             <span class="gaget-page-loader__ring"></span>
-            <span class="gaget-page-loader__core">M</span>
+            <span class="gaget-page-loader__core">{{ mb_strtoupper(mb_substr(trim($settings->store_name ?? config('app.name', 'Bynnas Social')) ?: 'B', 0, 1)) }}</span>
         </div>
-        <p class="gaget-page-loader__text">{{ $settings->store_name ?? config('app.name', 'Maks Gadget') }}</p>
+        <p class="gaget-page-loader__text">{{ $settings->store_name ?? config('app.name', 'Bynnas Social') }}</p>
         <p class="gaget-page-loader__sub" id="gaget-loader-msg">Loading</p>
     </div>
 </div>
@@ -861,7 +876,7 @@
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     </div>
                     <p class="gaget-cart-empty__title">Your cart is empty</p>
-                    <p class="gaget-cart-empty__text">Browse the shop and add gadgets you like.</p>
+                    <p class="gaget-cart-empty__text">Browse the shop and add products you like.</p>
                     <button type="button" class="gaget-btn-primary gaget-cart-empty__cta" @click="closeCart()">Continue shopping</button>
                 </div>
             </template>

@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div>
             <h2 class="text-lg font-semibold text-slate-900">{{ __('My Profile') }}</h2>
-            <p class="mt-0.5 text-sm text-slate-500">Manage your account details for {{ config('app.name', 'Maks Gadget') }}</p>
+            <p class="mt-0.5 text-sm text-slate-500">Manage your account details for {{ config('app.name', 'Bynnas Social') }}</p>
         </div>
     </x-slot>
 

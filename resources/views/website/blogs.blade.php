@@ -1,7 +1,7 @@
 @extends('website.layout')
 @php
     $settings = $settings ?? (object) [];
-    $storeName = data_get($settings, 'store_name', config('app.name', 'Maks Gadget'));
+    $storeName = data_get($settings, 'store_name', config('app.name', 'Bynnas Social'));
     $heroKicker = data_get($settings, 'blog_hero_kicker') ?: 'OUR BLOG';
     $heroTitle = data_get($settings, 'blog_hero_title') ?: 'News & Articles';
     $heroSub = data_get($settings, 'blog_hero_subtitle')

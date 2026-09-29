@@ -1,6 +1,7 @@
 {{-- Shared admin UI for category shop filters --}}
 @php
     $filterConfig = $filterConfig ?? $filterDefaults ?? \App\Support\CategoryFilterConfig::defaults();
+    $filterAttributes = \App\Models\ProductAttribute::forShop((int) auth()->user()->shop_id)->get(['id', 'name', 'slug']);
 @endphp
 
 <div class="mt-8 border-t border-gray-100 pt-6"
@@ -8,7 +9,7 @@
     <div class="flex items-start justify-between gap-4 mb-4">
         <div>
             <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider">Shop sidebar filters</h3>
-            <p class="text-xs text-gray-500 mt-1">When customers open this category (e.g. Phones), these options appear on the left.</p>
+            <p class="text-xs text-gray-500 mt-1">When customers open this category (e.g. Fashion), these options appear on the left.</p>
         </div>
         <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
             <input type="hidden" name="filter_enabled" value="0">
@@ -36,10 +37,16 @@
                     <select :name="'filter_groups['+gIndex+'][type]'" x-model="group.type" class="rounded-lg border-gray-300 text-sm">
                         <option value="availability">Availability</option>
                         <option value="brand">Brand (from products)</option>
-                        <option value="storage">Storage / ROM (from products)</option>
-                        <option value="ram">RAM (from products)</option>
-                        <option value="color">Color (from products)</option>
+                        <option value="attribute">Product attribute (Color, Size, …)</option>
                         <option value="custom">Custom options</option>
+                    </select>
+                    <select x-show="group.type === 'attribute'" x-cloak x-model="group.key"
+                            @change="if (!group.label || group.label === 'New filter') group.label = $event.target.selectedOptions[0]?.text || group.label"
+                            class="rounded-lg border-gray-300 text-sm">
+                        <option value="">Choose attribute…</option>
+                        @foreach($filterAttributes as $attr)
+                            <option value="{{ $attr->slug }}">{{ $attr->name }}</option>
+                        @endforeach
                     </select>
                     <input type="hidden" :name="'filter_groups['+gIndex+'][key]'" :value="group.key">
                     <button type="button" @click="groups.splice(gIndex, 1)" class="text-xs font-bold text-rose-600 hover:underline">Remove</button>
@@ -57,7 +64,7 @@
                     <button type="button" @click="group.options.push({label:'', value:''})" class="text-xs font-bold text-indigo-600 hover:underline">+ Add option</button>
                 </div>
 
-                <p class="text-[11px] text-gray-500" x-show="group.type === 'brand' || group.type === 'storage' || group.type === 'ram' || group.type === 'color'">
+                <p class="text-[11px] text-gray-500" x-show="['brand', 'attribute'].includes(group.type)">
                     Options are filled automatically from products in this category.
                 </p>
             </div>

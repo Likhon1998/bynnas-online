@@ -175,7 +175,8 @@
                                 'Download the demo CSV, open it in Excel, replace the sample rows with your products, then Save As → CSV UTF-8.',
                                 'CSV file should be encoded in UTF-8 for special characters.',
                                 'Maximum file size allowed is 5 MB.',
-                                'Duplicate barcodes will be skipped.',
+                                'barcode is optional — leave it blank and a product code is generated. Duplicate barcodes are skipped.',
+                                'Variants: give rows the same variant_group and fill attribute columns (color, size, material, storage, ram, weight). Add attr_fabric style columns for new attributes.',
                                 'stock_quantity creates opening stock with inventory + accounts audit trail.',
                                 'Pictures: paste a public image_url in the CSV, OR leave blank and upload photos later from Edit Product.',
                                 'Comma, semicolon, or tab separators are supported.',
@@ -205,11 +206,15 @@
             <div class="flex flex-col gap-2.5 mb-5">
                 <div class="csv-badge-req">
                     <span class="uppercase tracking-wide text-[10px] font-extrabold opacity-80">Required</span>
-                    <span>name, barcode, cost_price, selling_price</span>
+                    <span>name, cost_price, selling_price</span>
                 </div>
                 <div class="csv-badge-opt">
                     <span class="uppercase tracking-wide text-[10px] font-extrabold opacity-80">Optional</span>
-                    <span>sku, category, brand, stock_quantity, alert_quantity, image_url, color, color_hex, ram, storage, variant_group, short_description</span>
+                    <span>barcode, sku, category, brand, stock_quantity, alert_quantity, image_url, variant_group, short_description, description, seo_title, meta_description</span>
+                </div>
+                <div class="csv-badge-opt">
+                    <span class="uppercase tracking-wide text-[10px] font-extrabold opacity-80">Attributes</span>
+                    <span>any attribute slug ({{ \App\Models\ProductAttribute::forShop((int) auth()->user()->shop_id)->pluck('slug')->implode(', ') ?: 'color, size, material' }}), color_hex, or attr_&lt;name&gt; for a new one</span>
                 </div>
             </div>
 
@@ -229,42 +234,46 @@
                             <th>name</th>
                             <th>barcode</th>
                             <th>category</th>
-                            <th>brand</th>
                             <th>cost_price</th>
                             <th>selling_price</th>
                             <th>stock_quantity</th>
-                            <th>image_url</th>
+                            <th>variant_group</th>
+                            <th>color</th>
+                            <th>size</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td>Samsung Galaxy S22 — Green / 8GB / 128GB</td>
-                            <td>8801234567001</td>
-                            <td>Smartphones</td>
-                            <td>Samsung</td>
-                            <td>24500</td>
-                            <td>28999</td>
-                            <td>10</td>
-                            <td class="text-slate-400">(optional https link)</td>
+                            <td>Classic Cotton T-Shirt - Black / M</td>
+                            <td class="text-slate-400">(auto)</td>
+                            <td>Fashion</td>
+                            <td>320</td>
+                            <td>650</td>
+                            <td>25</td>
+                            <td>classic-cotton-tee</td>
+                            <td>Black</td>
+                            <td>M</td>
                         </tr>
                         <tr>
-                            <td>Somostel 65W GaN Charger</td>
-                            <td>8801234567002</td>
-                            <td>Chargers</td>
-                            <td>Somostel</td>
-                            <td>900</td>
-                            <td>1490</td>
-                            <td>40</td>
+                            <td>Classic Cotton T-Shirt - Black / L</td>
+                            <td class="text-slate-400">(auto)</td>
+                            <td>Fashion</td>
+                            <td>320</td>
+                            <td>650</td>
+                            <td>18</td>
+                            <td>classic-cotton-tee</td>
+                            <td>Black</td>
+                            <td>L</td>
+                        </tr>
+                        <tr>
+                            <td>Ceramic Coffee Mug 350ml</td>
+                            <td>8801234500011</td>
+                            <td>Home &amp; Kitchen</td>
+                            <td>150</td>
+                            <td>390</td>
+                            <td>30</td>
                             <td></td>
-                        </tr>
-                        <tr>
-                            <td>Oraimo FreePods 4</td>
-                            <td>8801234567003</td>
-                            <td>Earbuds</td>
-                            <td>Oraimo</td>
-                            <td>1600</td>
-                            <td>2290</td>
-                            <td>22</td>
+                            <td></td>
                             <td></td>
                         </tr>
                     </tbody>

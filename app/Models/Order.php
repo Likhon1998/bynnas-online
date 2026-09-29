@@ -37,6 +37,23 @@ class Order extends Model
         'courier_collected_at',
         'courier_collected_amount',
 
+        // Social / campaign attribution (online orders)
+        'campaign_id',
+        'utm_source',
+        'utm_medium',
+        'utm_campaign',
+        'utm_content',
+        'utm_term',
+        'landing_page',
+        'referrer_host',
+        'landing_page_id',
+
+        // Delivery details captured when the order was placed
+        'delivery_name',
+        'delivery_phone',
+        'delivery_address',
+        'customer_note',
+
         // Exchange & Return tracking fields
         'is_exchange_receipt',
         'exchange_for_order_id',
@@ -211,6 +228,16 @@ class Order extends Model
     public function items()
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function campaign()
+    {
+        return $this->belongsTo(Campaign::class);
+    }
+
+    public function landingPage()
+    {
+        return $this->belongsTo(LandingPage::class);
     }
 
     public function statusLogs()

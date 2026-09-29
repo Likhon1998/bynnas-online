@@ -1,6 +1,6 @@
 @extends('website.layout')
 
-@section('title', 'Track Order — '.($settings->store_name ?? config('app.name', 'Maks Gadget')))
+@section('title', 'Track Order — '.($settings->store_name ?? config('app.name', 'Bynnas Social')))
 
 @section('content')
 <div class="max-w-3xl mx-auto px-4 py-12">

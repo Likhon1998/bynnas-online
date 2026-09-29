@@ -9,7 +9,7 @@
         'slate' => 'text-slate-600 bg-slate-100',
     ];
 @endphp
-@section('title', $blog->title.' — '.($settings->store_name ?? config('app.name', 'Maks Gadget')))
+@section('title', $blog->title.' — '.($settings->store_name ?? config('app.name', 'Bynnas Social')))
 @section('content')
 <div class="max-w-7xl mx-auto px-4 py-8">
     <p class="text-xs text-slate-400 mb-5">

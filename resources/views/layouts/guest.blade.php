@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ config('app.name', 'Maks Gadget') }}</title>
+    <title>{{ config('app.name', 'Bynnas Social') }}</title>
     @include('partials.favicon')
 
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -21,7 +21,7 @@
                 <svg class="w-10 h-10 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
                 </svg>
-                <h1 class="text-4xl font-bold tracking-tight">{{ config('app.name', 'Maks Gadget') }}</h1>
+                <h1 class="text-4xl font-bold tracking-tight">{{ config('app.name', 'Bynnas Social') }}</h1>
             </div>
             <p class="text-slate-400 text-lg max-w-md">Absolute transparency and seamless inventory management for modern retail.</p>
         </div>
@@ -31,7 +31,7 @@
                 <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
                 </svg>
-                <h1 class="text-2xl font-bold text-slate-900">{{ config('app.name', 'Maks Gadget') }}</h1>
+                <h1 class="text-2xl font-bold text-slate-900">{{ config('app.name', 'Bynnas Social') }}</h1>
             </div>
 
             <div class="w-full sm:max-w-md bg-white px-6 py-8 shadow-xl sm:rounded-lg border border-gray-100">

@@ -50,6 +50,14 @@
                    class="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-white px-2 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-50">
                     Import
                 </a>
+                <a href="{{ route('products.variants') }}"
+                   class="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50">
+                    Variants
+                </a>
+                <a href="{{ route('attributes.index') }}"
+                   class="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50">
+                    Attributes
+                </a>
             </div>
         </div>
 

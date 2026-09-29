@@ -1,6 +1,6 @@
 @extends('website.layout')
 
-@section('title', 'My Account — ' . ($settings->store_name ?? config('app.name', 'Maks Gadget')))
+@section('title', 'My Account — ' . ($settings->store_name ?? config('app.name', 'Bynnas Social')))
 
 @section('content')
 @php

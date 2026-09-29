@@ -29,7 +29,7 @@
                             input-class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                             preview-class="h-16 max-w-full object-contain rounded-lg border border-slate-200 bg-white p-1"
                         />
-                        <p class="mt-1 text-xs text-gray-500">PNG, JPG, WEBP, GIF or SVG — max 5MB. Extra whitespace is cropped automatically so the logo fits cleanly in “Gadget Lovers” on the homepage. If you skip this, a simple text mark is used.</p>
+                        <p class="mt-1 text-xs text-gray-500">PNG, JPG, WEBP, GIF or SVG — max 5MB. Extra whitespace is cropped automatically so the logo fits cleanly in the homepage brands strip. If you skip this, a simple text mark is used.</p>
                         <x-input-error class="mt-2" :messages="$errors->get('logo')" />
                     </div>
 

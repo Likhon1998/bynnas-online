@@ -31,7 +31,7 @@
             ],
             (object) [
                 'title' => 'Best Sellers',
-                'sub' => 'Most loved gadgets',
+                'sub' => 'Most loved products',
                 'url' => route('website.shop'),
                 'cta' => 'Shop',
                 'badge' => 'Hot',
@@ -102,7 +102,7 @@
                                     <div class="tn-hero-fallback-inner">
                         <p class="tn-hero-kicker">{{ data_get($settings, 'special_offer_text') ?: 'Premium Electronics' }}</p>
                         <h1 class="tn-hero-title">Upgrade Your Digital Life</h1>
-                        <p class="tn-hero-sub">Discover the latest gadgets, unbeatable deals, and premium tech at {{ $settings->store_name ?? 'our store' }}.</p>
+                        <p class="tn-hero-sub">Discover trending products, unbeatable deals, and fast delivery at {{ $settings->store_name ?? 'our store' }}.</p>
                         <div class="tn-hero-actions">
                             <a href="{{ route('website.shop') }}" class="tn-btn tn-btn-primary">Shop Now</a>
                             <a href="{{ route('website.shop', ['filter' => 'new']) }}" class="tn-btn tn-btn-outline">Explore Collection</a>
@@ -117,7 +117,7 @@
                                 <div class="tn-hero-fallback-inner">
                     <p class="tn-hero-kicker">{{ data_get($settings, 'special_offer_text') ?: 'Premium Electronics' }}</p>
                     <h1 class="tn-hero-title">Upgrade Your Digital Life</h1>
-                                    <p class="tn-hero-sub">Discover the latest gadgets, unbeatable deals, and premium tech at {{ $settings->store_name ?? config('app.name', 'Maks Gadget') }}.</p>
+                                    <p class="tn-hero-sub">Discover trending products, unbeatable deals, and fast delivery at {{ $settings->store_name ?? config('app.name', 'Bynnas Social') }}.</p>
                     <div class="tn-hero-actions">
                         <a href="{{ route('website.shop') }}" class="tn-btn tn-btn-primary">Shop Now</a>
                         <a href="{{ route('website.shop', ['filter' => 'new']) }}" class="tn-btn tn-btn-outline">Explore Collection</a>
@@ -202,6 +202,12 @@
 @php
     $homeCopy = data_get($settings, 'home_copy') ?: [];
     $catTaglines = [
+        'fashion' => 'Wear what gets noticed.',
+        'cosmetics-beauty' => 'Glow, every single day.',
+        'toys-kids' => 'Playtime, upgraded.',
+        'baby-care' => 'Gentle care for little ones.',
+        'home-kitchen' => 'Make home feel good.',
+        'electronics' => 'Smart picks for daily life.',
         'smartphones' => 'Power in your pocket.',
         'phones' => 'Power in your pocket.',
         'laptops' => 'Create. Work. Win.',
@@ -220,6 +226,13 @@
         'drones' => 'Sky is the limit.',
     ];
     $catFallbacks = [
+        'box' => 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=900&q=85',
+        'shirt' => 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=900&q=85',
+        'sparkles' => 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=900&q=85',
+        'toy' => 'https://images.unsplash.com/photo-1558060370-d644479cb6f7?w=900&q=85',
+        'baby' => 'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=900&q=85',
+        'home' => 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=900&q=85',
+        'bag' => 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=900&q=85',
         'phone' => 'https://images.unsplash.com/photo-1592890288564-766794220d53?w=900&q=85',
         'laptop' => 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=900&q=85',
         'tablet' => 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=900&q=85',
@@ -359,7 +372,7 @@
                 <div class="mg-cover-copy">
                     <p class="mg-cover-eyebrow">{{ $homeCopy['categories_eyebrow'] ?? 'Curated collections' }}</p>
                     <h2 class="mg-cover-title">{{ $homeCopy['categories_title'] ?? 'Shop by' }} <span>{{ $homeCopy['categories_title_accent'] ?? 'Category' }}</span></h2>
-                    <p class="mg-cover-sub">{{ $homeCopy['categories_subtitle'] ?? 'Premium gadgets, sorted for how you live — browse the collection.' }}</p>
+                    <p class="mg-cover-sub">{{ $homeCopy['categories_subtitle'] ?? 'Everything you love, sorted by category — browse the collection.' }}</p>
                 </div>
                 <a href="{{ route('website.shop') }}" class="mg-cover-all">View all <span aria-hidden="true">→</span></a>
             </div>
@@ -421,7 +434,7 @@
                 @php
                     $iconMeta = $category->iconMeta();
                     $slug = $category->slug ?? \Illuminate\Support\Str::slug($category->name);
-                    $img = $ws->categoryImageUrl($category) ?: ($catFallbacks[$iconMeta['key']] ?? $catFallbacks['phone']);
+                    $img = $ws->categoryImageUrl($category) ?: ($catFallbacks[$iconMeta['key']] ?? $catFallbacks['box']);
                     $tagline = trim((string) ($category->description ?? ''))
                         ?: ($catTaglines[$slug] ?? ($catTaglines[$iconMeta['key']] ?? 'Explore the collection.'));
                     $count = (int) ($category->products_count ?? 0);
@@ -483,7 +496,7 @@
                     <h2 class="tn-flash-title">{{ $homeCopy['flash_title'] ?? 'Flash' }} <span>{{ $homeCopy['flash_title_accent'] ?? 'Sale' }}</span></h2>
                     <span class="tn-flash-live">Live</span>
                 </div>
-                <p class="tn-flash-sub">{{ $homeCopy['flash_subtitle'] ?? 'Today’s best prices on selected gadgets — ends when the timer hits zero.' }}</p>
+                <p class="tn-flash-sub">{{ $homeCopy['flash_subtitle'] ?? 'Today’s best prices on selected products — ends when the timer hits zero.' }}</p>
                 <div class="tn-countdown tn-countdown--flash" x-data="{
                     h:0,m:0,s:0,
                     end: {{ ($flashSaleEndsAt ?? null) ? ((int) $flashSaleEndsAt->timestamp * 1000) : 'null' }},
@@ -594,7 +607,7 @@
             <div class="tn-section-copy">
                 <p class="tn-section-eyebrow">{{ $homeCopy['new_eyebrow'] ?? 'Just landed' }}</p>
                 <h2 class="tn-section-title">{{ $homeCopy['new_title'] ?? 'New' }} <span>{{ $homeCopy['new_title_accent'] ?? 'Arrivals' }}</span></h2>
-                <p class="tn-section-sub">{{ $homeCopy['new_subtitle'] ?? 'Fresh gadgets added to the store — explore what’s new this week.' }}</p>
+                <p class="tn-section-sub">{{ $homeCopy['new_subtitle'] ?? 'Fresh arrivals added to the store — explore what’s new this week.' }}</p>
             </div>
             <a href="{{ route('website.shop', ['filter' => 'new']) }}" class="tn-section-link">View all new arrivals <span aria-hidden="true">→</span></a>
         </div>
@@ -672,7 +685,7 @@
             <div class="tn-brands-copy">
                 <p class="tn-brands-eyebrow">{{ $homeCopy['brands_eyebrow'] ?? 'Partners' }}</p>
                 <h2 id="tn-brands-heading" class="tn-brands-title">{{ $homeCopy['brands_title'] ?? 'Brands We' }} <span>{{ $homeCopy['brands_title_accent'] ?? 'Carry' }}</span></h2>
-                <p class="tn-brands-sub">{{ $homeCopy['brands_subtitle'] ?? 'Trusted names in gadgets — quality, performance, and innovation.' }}</p>
+                <p class="tn-brands-sub">{{ $homeCopy['brands_subtitle'] ?? 'Trusted brands — quality you can count on.' }}</p>
             </div>
         </div>
             </div>
@@ -686,7 +699,7 @@
                         $logoUrl = $brand->logo_url
                             ?: ($brand->logo_path ? public_storage_url($brand->logo_path) : null);
                         $tagline = trim((string) ($brand->tagline ?? ''))
-                            ?: ($brandTaglines[$brandSlug] ?? 'Gadgets · Accessories');
+                            ?: ($brandTaglines[$brandSlug] ?? 'Shop the collection');
                     @endphp
                     <a href="{{ route('website.brand', $brandSlug) }}"
                        class="tn-brand-card"
@@ -722,7 +735,7 @@
     $dealsKicker = data_get($settings, 'deals_kicker') ?: 'This week';
     $dealsTitle = data_get($settings, 'deals_title') ?: 'Featured';
     $dealsAccent = data_get($settings, 'deals_title_accent') ?: 'Deals';
-    $dealsSub = data_get($settings, 'deals_subtitle') ?: 'Premium gadgets at carefully chosen prices.';
+    $dealsSub = data_get($settings, 'deals_subtitle') ?: 'Top products at carefully chosen prices.';
 @endphp
 <section class="tn-deals" aria-labelledby="tn-deals-heading">
     <div class="tn-deals-glow" aria-hidden="true"></div>
@@ -851,7 +864,7 @@
             <div class="tn-blog-head-main">
                 <div class="tn-blog-head-copy">
                     <h2 id="tn-blog-heading" class="tn-blog-heading">{{ $homeCopy['blog_title'] ?? 'Latest from the' }} <em>{{ $homeCopy['blog_title_accent'] ?? 'Blog' }}</em></h2>
-                    <p class="tn-blog-sub">{{ $homeCopy['blog_subtitle'] ?? 'Stay ahead with gadget tips, reviews, guides and tech insights.' }}</p>
+                    <p class="tn-blog-sub">{{ $homeCopy['blog_subtitle'] ?? 'Stay ahead with tips, reviews, guides and shopping insights.' }}</p>
                 </div>
                 <a href="{{ route('website.blogs') }}" class="tn-blog-all">
                     View All Articles

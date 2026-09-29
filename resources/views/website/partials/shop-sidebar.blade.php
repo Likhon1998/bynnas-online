@@ -4,12 +4,10 @@
     $minPrice = request()->filled('min_price') ? (float) request('min_price') : $boundMin;
     $maxPrice = request()->filled('max_price') ? (float) request('max_price') : $boundMax;
     $selectedBrands = array_map('intval', (array) request('brands', []));
-    $selectedStorages = array_map('strval', (array) request('storage', []));
-    $selectedRams = array_map('strval', (array) request('ram', []));
+    $selectedAttributes = app(\App\Services\WebsiteService::class)->selectedAttributeFilters(request());
     $categories = $categories ?? collect();
     $brands = $brands ?? collect();
-    $storageOptions = $storageOptions ?? collect();
-    $ramOptions = $ramOptions ?? collect();
+    $attributeFacets = $attributeFacets ?? [];
     $categoryTotal = (int) ($categoryTotal ?? $categories->sum('published_count'));
     $activeCat = request('category')
         ?: (isset($activeCategory) ? ($activeCategory->slug ?: $activeCategory->id) : null);
@@ -17,7 +15,7 @@
     $visibleBrands = 5;
 @endphp
 
-<aside class="gs-sidebar" data-gs-sidebar-slot x-data="{ filtersOpen: {{ request()->hasAny(['brands', 'storage', 'ram', 'min_price', 'max_price', 'category']) ? 'true' : 'false' }} }" :class="{ 'is-open': filtersOpen }">
+<aside class="gs-sidebar" data-gs-sidebar-slot x-data="{ filtersOpen: {{ request()->hasAny(['brands', 'attr', 'storage', 'ram', 'min_price', 'max_price', 'category']) ? 'true' : 'false' }} }" :class="{ 'is-open': filtersOpen }">
     <button type="button"
             class="gs-filters-toggle"
             @click="filtersOpen = !filtersOpen"
@@ -91,43 +89,37 @@
             </ul>
         </div>
 
-        {{-- RAM --}}
-        @if($ramOptions->isNotEmpty())
+        {{-- Product attributes (Color, Size, Material, …) --}}
+        @foreach($attributeFacets as $facet)
+            @php $picked = $selectedAttributes[$facet['slug']] ?? []; @endphp
             <div class="gs-filter-block">
-                <h3 class="gs-filter-title">RAM</h3>
-                <ul class="gs-brand-list">
-                    @foreach($ramOptions as $ram)
-                        <li>
-                            <label class="gs-check">
-                                <input type="checkbox" name="ram[]" value="{{ $ram }}"
-                                       @checked(in_array((string) $ram, $selectedRams, true))
+                <h3 class="gs-filter-title">{{ $facet['name'] }}</h3>
+                @if($facet['type'] === \App\Models\ProductAttribute::TYPE_COLOR)
+                    <div class="gs-swatch-list">
+                        @foreach($facet['options'] as $option)
+                            <label class="gs-swatch" title="{{ $option['label'] }}">
+                                <input type="checkbox" name="attr[{{ $facet['slug'] }}][]" value="{{ $option['value'] }}"
+                                       @checked(in_array($option['value'], $picked, true))
                                        @change="$dispatch('shop-refresh')">
-                                <span class="gs-check-label">{{ $ram }}</span>
+                                <span class="gs-swatch-dot" style="background: {{ $option['hex'] }}"></span>
+                                <span class="gs-swatch-label">{{ $option['label'] }}</span>
                             </label>
-                        </li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
-
-        {{-- ROM / Storage --}}
-        @if($storageOptions->isNotEmpty())
-            <div class="gs-filter-block">
-                <h3 class="gs-filter-title">ROM / Storage</h3>
-                <ul class="gs-brand-list">
-                    @foreach($storageOptions as $storage)
-                        <li>
-                            <label class="gs-check">
-                                <input type="checkbox" name="storage[]" value="{{ $storage }}"
-                                       @checked(in_array((string) $storage, $selectedStorages, true))
+                        @endforeach
+                    </div>
+                @else
+                    <div class="gs-chip-list">
+                        @foreach($facet['options'] as $option)
+                            <label class="gs-chip">
+                                <input type="checkbox" name="attr[{{ $facet['slug'] }}][]" value="{{ $option['value'] }}"
+                                       @checked(in_array($option['value'], $picked, true))
                                        @change="$dispatch('shop-refresh')">
-                                <span class="gs-check-label">{{ $storage }}</span>
+                                <span>{{ $option['label'] }}</span>
                             </label>
-                        </li>
-                    @endforeach
-                </ul>
+                        @endforeach
+                    </div>
+                @endif
             </div>
-        @endif
+        @endforeach
 
         {{-- Price --}}
         <div class="gs-filter-block">

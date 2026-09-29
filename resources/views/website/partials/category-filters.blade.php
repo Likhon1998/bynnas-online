@@ -1,4 +1,4 @@
-<aside class="gs-sidebar gaget-filter-sidebar-wrap" data-gs-sidebar-slot x-data="{ filtersOpen: {{ request()->hasAny(['brands', 'storage', 'ram', 'min_price', 'max_price', 'color']) ? 'true' : 'false' }} }" :class="{ 'is-open': filtersOpen }">
+<aside class="gs-sidebar gaget-filter-sidebar-wrap" data-gs-sidebar-slot x-data="{ filtersOpen: {{ request()->hasAny(array_merge(['min_price', 'max_price'], array_column($sidebarFacets ?? [], 'key'))) ? 'true' : 'false' }} }" :class="{ 'is-open': filtersOpen }">
     <button type="button"
             class="gs-filters-toggle"
             @click="filtersOpen = !filtersOpen"
@@ -54,6 +54,9 @@
                         @endphp
                         <label class="gaget-filter-check">
                             <input type="checkbox" name="{{ $facet['key'] }}[]" value="{{ $option['value'] }}" @checked($checked) onchange="this.form.submit()">
+                            @if(!empty($option['hex']))
+                                <span class="inline-block h-3.5 w-3.5 shrink-0 rounded-full border border-black/10" style="background: {{ $option['hex'] }}"></span>
+                            @endif
                             <span>{{ $option['label'] }}</span>
                         </label>
                     @endforeach

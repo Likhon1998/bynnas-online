@@ -3,6 +3,8 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\BrandController;
+use App\Http\Controllers\CampaignController;
+use App\Http\Controllers\CampaignLandingPageController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CounterController;
 use App\Http\Controllers\CounterSessionController;
@@ -17,7 +19,9 @@ use App\Http\Controllers\OrderCancellationController;
 use App\Http\Controllers\OrderInvoiceController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\PosSettingsController;
+use App\Http\Controllers\ProductAttributeController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductFamilyController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
@@ -71,7 +75,11 @@ Route::post('/cart/sync', [WebsiteController::class, 'syncCart'])->name('website
 Route::get('/search/suggest', [WebsiteController::class, 'searchSuggest'])->name('website.search.suggest');
 Route::get('/category/{slug}', [WebsiteController::class, 'category'])->name('website.category');
 Route::get('/brand/{slug}', [WebsiteController::class, 'brand'])->name('website.brand');
-Route::get('/product/{product}', [WebsiteController::class, 'product'])->name('website.product');
+Route::get('/product/{product:slug}', [WebsiteController::class, 'product'])->name('website.product');
+Route::get('/go/{code}', [CampaignController::class, 'go'])->where('code', '[A-Za-z0-9]{4,16}')->name('campaign.go');
+Route::get('/campaign/{slug}', [CampaignLandingPageController::class, 'show'])->where('slug', '[A-Za-z0-9\-_]+')->name('website.landing');
+Route::post('/campaign/{slug}/order', [CampaignLandingPageController::class, 'order'])->where('slug', '[A-Za-z0-9\-_]+')
+    ->middleware('throttle:10,1')->name('website.landing.order');
 Route::get('/track-order', [WebsiteController::class, 'trackOrder'])->name('website.track');
 Route::post('/track-order', [WebsiteController::class, 'trackOrderLookup'])->name('website.track.lookup');
 
@@ -200,6 +208,11 @@ Route::middleware([
 
     Route::resource('customers', CustomerController::class);
 
+    Route::middleware('can:manage campaigns')->group(function () {
+        Route::resource('campaigns', CampaignController::class);
+        Route::resource('landing-pages', CampaignLandingPageController::class)->except('show');
+    });
+
     Route::middleware('can:manage inventory')->group(function () {
         Route::resource('categories', CategoryController::class)->except(['show']);
         Route::resource('brands', BrandController::class)->except(['show']);
@@ -214,6 +227,16 @@ Route::middleware([
         Route::post('/products-import/csv', [ProductController::class, 'importStore'])->name('products.import.store');
         Route::get('/products-barcodes', [ProductController::class, 'barcodes'])->name('products.barcodes');
         Route::get('/products-barcodes/print', [ProductController::class, 'barcodesPrint'])->name('products.barcodes.print');
+        Route::get('/products-variants', [ProductFamilyController::class, 'index'])->name('products.variants');
+
+        Route::get('/attributes', [ProductAttributeController::class, 'index'])->name('attributes.index');
+        Route::post('/attributes', [ProductAttributeController::class, 'store'])->name('attributes.store');
+        Route::patch('/attributes/{productAttribute}', [ProductAttributeController::class, 'update'])->name('attributes.update');
+        Route::delete('/attributes/{productAttribute}', [ProductAttributeController::class, 'destroy'])->name('attributes.destroy');
+        Route::post('/attributes/{productAttribute}/values', [ProductAttributeController::class, 'storeValue'])->name('attributes.values.store');
+        Route::patch('/attribute-values/{attributeValue}', [ProductAttributeController::class, 'updateValue'])->name('attributes.values.update');
+        Route::delete('/attribute-values/{attributeValue}', [ProductAttributeController::class, 'destroyValue'])->name('attributes.values.destroy');
+
         Route::get('/stock-ledger', fn () => redirect()->route('supply.adjustments.index'))->name('stock.index');
         Route::post('/stock-ledger', [StockAdjustmentController::class, 'store'])->name('stock.store');
     });

@@ -12,7 +12,7 @@
         @php
             $navSettings = \App\Models\SiteSetting::current();
             $navName = $navSettings->store_name
-                ?: (Auth::user()->shop->name ?? config('app.name', 'Maks Gadget'));
+                ?: (Auth::user()->shop->name ?? config('app.name', 'Bynnas Social'));
             $navIcon = $navSettings->favicon_path
                 ? public_storage_url($navSettings->favicon_path)
                 : ($navSettings->logo_path ? public_storage_url($navSettings->logo_path) : null);
@@ -47,7 +47,7 @@
 
     @php
         $isCatalog = request()->routeIs('brands.*', 'categories.*')
-            || request()->routeIs('products.create', 'products.import*', 'products.barcodes*');
+            || request()->routeIs('products.create', 'products.import*', 'products.barcodes*', 'products.variants', 'attributes.*');
         $isInventory = request()->routeIs('supply.*', 'stock.*');
         $isSalesTools = request()->routeIs('pos.settings.*', 'counters.sessions.*');
         $isCredit = request()->routeIs('customers.baki.*', 'customers.emi.*');
@@ -121,6 +121,19 @@
         </a>
         @endcan
 
+        @can('manage campaigns')
+        <a :title="sidebarCollapsed ? 'Campaigns' : null" href="{{ route('campaigns.index') }}"
+           class="nav-link nav-tone-customers {{ request()->routeIs('campaigns.*') ? 'is-active' : '' }}">
+            <span class="nav-ico-wrap"><svg class="nav-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg></span>
+            <span class="nav-label">Campaigns</span>
+        </a>
+        <a :title="sidebarCollapsed ? 'Landing pages' : null" href="{{ route('landing-pages.index') }}"
+           class="nav-link nav-tone-customers {{ request()->routeIs('landing-pages.*') ? 'is-active' : '' }}">
+            <span class="nav-ico-wrap"><svg class="nav-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 4h16M9 13h6m-6 3h4"/></svg></span>
+            <span class="nav-label">Landing pages</span>
+        </a>
+        @endcan
+
         @if(Auth::user()->isAdminUser())
         <a :title="sidebarCollapsed ? 'Accounts' : null" href="{{ route('accounts.opening-balance') }}"
            class="nav-link nav-tone-accounts {{ request()->routeIs('accounts.*') ? 'is-active' : '' }}">
@@ -161,6 +174,8 @@
             <a href="{{ route('brands.index') }}" class="nav-sub {{ request()->routeIs('brands.*') ? 'is-active' : '' }}"><svg class="nav-sub-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg><span>Brands</span></a>
             <a href="{{ route('categories.index') }}" class="nav-sub {{ request()->routeIs('categories.*') ? 'is-active' : '' }}"><svg class="nav-sub-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg><span>Categories</span></a>
             <a href="{{ route('products.create') }}" class="nav-sub {{ request()->routeIs('products.create') ? 'is-active' : '' }}"><svg class="nav-sub-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 4v16m8-8H4"/></svg><span>Add Product</span></a>
+            <a href="{{ route('products.variants') }}" class="nav-sub {{ request()->routeIs('products.variants') ? 'is-active' : '' }}"><svg class="nav-sub-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 6h16M4 10h16M4 14h10M4 18h10"/></svg><span>Variants</span></a>
+            <a href="{{ route('attributes.index') }}" class="nav-sub {{ request()->routeIs('attributes.*') ? 'is-active' : '' }}"><svg class="nav-sub-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg><span>Attributes</span></a>
             <a href="{{ route('products.import') }}" class="nav-sub {{ request()->routeIs('products.import*') ? 'is-active' : '' }}"><svg class="nav-sub-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg><span>Import CSV</span></a>
             <a href="{{ route('products.barcodes') }}" class="nav-sub {{ request()->routeIs('products.barcodes*') ? 'is-active' : '' }}"><svg class="nav-sub-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 7v10M8 4v16M12 7v10M16 5v14M20 8v8"/></svg><span>Barcodes</span></a>
         </div>

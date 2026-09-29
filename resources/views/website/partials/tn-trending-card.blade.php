@@ -5,7 +5,7 @@
     $discount = $product->discountPercent();
     $img = $ws->productImageUrl($product);
     $displayName = $product->storefrontDisplayName();
-    $catLabel = strtoupper($product->category?->name ?? $product->brand_name ?? 'Gadgets');
+    $catLabel = strtoupper($product->category?->name ?? $product->brand_name ?? 'Products');
     $rank = (int) ($trendingRank ?? 1);
     $rating = (float) ($product->rating ?? 0);
     $reviews = (int) ($product->review_count ?? 0);

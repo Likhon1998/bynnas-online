@@ -23,7 +23,7 @@ class BlogSeeder extends Seeder
         if (! $settings) {
             $settings = SiteSetting::create([
                 'default_shop_id' => $shop->id,
-                'store_name' => 'Maks Gadget',
+                'store_name' => 'Bynnas Social',
                 'currency_code' => 'BDT',
                 'currency_symbol' => '৳',
             ]);
@@ -39,10 +39,10 @@ class BlogSeeder extends Seeder
             'default_shop_id' => $settings->default_shop_id ?: $shop->id,
             'blog_hero_kicker' => 'OUR BLOG',
             'blog_hero_title' => 'News & Articles',
-            'blog_hero_subtitle' => 'Stay updated with the latest tech news, product reviews, and buying guides from Maks Gadget.',
+            'blog_hero_subtitle' => 'Stay updated with product news, reviews, and buying guides from Bynnas Social.',
             'blog_articles_title' => 'Latest Articles',
             'blog_newsletter_title' => 'Subscribe to Our Newsletter',
-            'blog_newsletter_text' => 'Get the latest deals and tech news delivered to your inbox.',
+            'blog_newsletter_text' => 'Get the latest deals and product news delivered to your inbox.',
             'blog_feature_1_title' => 'Expert Reviews',
             'blog_feature_1_text' => 'In-depth & honest',
             'blog_feature_2_title' => 'Buying Guides',

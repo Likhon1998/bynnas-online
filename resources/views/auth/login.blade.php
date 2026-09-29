@@ -1,6 +1,6 @@
 <x-login-layout>
     @php
-        $brandName = data_get($settings ?? null, 'store_name') ?: config('app.name', 'Maks Gadget');
+        $brandName = data_get($settings ?? null, 'store_name') ?: config('app.name', 'Bynnas Social');
         $brandLogo = !empty(data_get($settings ?? null, 'logo_path'))
             ? public_storage_url($settings->logo_path)
             : null;

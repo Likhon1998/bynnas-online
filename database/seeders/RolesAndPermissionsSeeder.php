@@ -21,6 +21,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage roles',
             'manage counters',
             'manage website',
+            'manage campaigns',
         ];
 
         foreach ($permissions as $permission) {
@@ -41,6 +42,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage inventory',
             'view sales ledger',
             'manage website',
+            'manage campaigns',
         ]);
 
         $shopOwnerRole = Role::firstOrCreate(['name' => 'Shop Owner', 'guard_name' => 'web']);

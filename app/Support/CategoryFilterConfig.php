@@ -9,6 +9,9 @@ use Illuminate\Support\Str;
 
 class CategoryFilterConfig
 {
+    /** Older configs stored these as their own filter types; they are product attributes now. */
+    private const LEGACY_ATTRIBUTE_TYPES = ['storage', 'ram', 'color'];
+
     public static function defaults(): array
     {
         return [
@@ -38,7 +41,22 @@ class CategoryFilterConfig
             return self::defaults();
         }
 
-        return array_replace_recursive(self::defaults(), $config);
+        $config = array_replace_recursive(self::defaults(), $config);
+        $config['groups'] = array_map([self::class, 'upgradeLegacyGroup'], $config['groups'] ?? []);
+
+        return $config;
+    }
+
+    private static function upgradeLegacyGroup(array $group): array
+    {
+        $type = $group['type'] ?? '';
+        if (in_array($type, self::LEGACY_ATTRIBUTE_TYPES, true)) {
+            $group['type'] = 'attribute';
+            $group['key'] = $type;
+            $group['options'] = [];
+        }
+
+        return $group;
     }
 
     public static function fromRequest(Request $request): array
@@ -54,15 +72,26 @@ class CategoryFilterConfig
                 continue;
             }
 
-            $type = in_array($group['type'] ?? '', ['availability', 'brand', 'storage', 'ram', 'color', 'custom'], true)
+            $type = in_array($group['type'] ?? '', ['availability', 'brand', 'attribute', 'custom'], true)
                 ? $group['type']
-                : 'custom';
+                : (in_array($group['type'] ?? '', self::LEGACY_ATTRIBUTE_TYPES, true) ? 'attribute' : 'custom');
 
             $key = trim((string) ($group['key'] ?? ''));
-            if ($key === '') {
-                $key = Str::slug($label, '_');
+            if (in_array($group['type'] ?? '', self::LEGACY_ATTRIBUTE_TYPES, true)) {
+                $key = $group['type'];
             }
-            $key = Str::slug($key, '_') ?: 'filter';
+            if ($type === 'attribute') {
+                // Key is the product attribute slug (e.g. "color", "screen-size").
+                $key = Str::slug($key);
+                if ($key === '') {
+                    continue;
+                }
+            } else {
+                if ($key === '') {
+                    $key = Str::slug($label, '_');
+                }
+                $key = Str::slug($key, '_') ?: 'filter';
+            }
 
             $options = [];
             foreach ($group['options'] ?? [] as $option) {
@@ -119,12 +148,6 @@ class CategoryFilterConfig
                 ->sort()
                 ->values()
                 ->map(fn ($name) => ['value' => Str::slug($name, '_'), 'label' => $name]),
-            'storage' => unique_memory_sizes($products->pluck('storage'))
-                ->map(fn ($v) => ['value' => Str::slug((string) $v, '_'), 'label' => (string) $v]),
-            'ram' => unique_memory_sizes($products->pluck('ram'))
-                ->map(fn ($v) => ['value' => Str::slug((string) $v, '_'), 'label' => (string) $v]),
-            'color' => $products->map(fn ($p) => $p->displayColor() ?: $p->color)->filter()->unique()->sort()->values()
-                ->map(fn ($v) => ['value' => Str::slug((string) $v, '_'), 'label' => (string) $v]),
             'custom' => $products->map(fn ($p) => data_get($p->filter_attributes, $key))
                 ->flatten()
                 ->filter()

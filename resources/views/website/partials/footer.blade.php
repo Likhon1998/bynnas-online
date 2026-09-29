@@ -1,8 +1,8 @@
 @php
-    $storeName = $settings->store_name ?? config('app.name', 'Maks Gadget');
+    $storeName = $settings->store_name ?? config('app.name', 'Bynnas Social');
     $storeLogo = !empty($settings->logo_path) ? public_storage_url($settings->logo_path) : null;
     $tagline = $settings->footer_tagline
-        ?? 'Your one-stop shop for the latest tech gadgets and accessories.';
+        ?? 'Your one-stop shop for trending products, delivered to your door.';
 
     $socialRaw = data_get($settings, 'social_links') ?: [];
     $socialMap = [
