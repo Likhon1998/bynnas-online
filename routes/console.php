@@ -20,6 +20,13 @@ Artisan::command('inspire', function () {
 | or every minute:
 |   php artisan schedule:run
 */
+/*
+| Staff alerts: abandoned-cart digests and shipments overdue for delivery.
+*/
+Schedule::command('commerce:scan-alerts')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping();
+
 if (retail_enabled()) {
     Schedule::command('counters:auto-close-sessions')
         ->dailyAt('00:00')

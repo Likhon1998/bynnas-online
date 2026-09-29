@@ -153,7 +153,7 @@ class LandingPageOrderTest extends TestCase
 
         $order = Order::latest('id')->firstOrFail();
         $this->assertStringStartsWith('WEB-', $order->invoice_no);
-        $this->assertSame('pending_fulfillment', $order->status);
+        $this->assertSame('new', $order->status);
         $this->assertSame($page->id, $order->landing_page_id);
         $this->assertSame('Rima Akter', $order->delivery_name);
         $this->assertSame('01711-000000', $order->delivery_phone);

@@ -395,14 +395,10 @@
                 status: 'all',
                 statusTabs: [
                     { key: 'all', label: 'All' },
-                    { key: 'pending', label: 'Pending' },
-                    { key: 'processing', label: 'Packing' },
-                    { key: 'shipped', label: 'Shipped' },
-                    { key: 'completed', label: 'Delivered' },
-                    { key: 'cancelled', label: 'Cancelled' },
-                    { key: 'returned', label: 'Returned' },
-                    { key: 'refunded', label: 'Refunded' },
+                    ...Object.entries(@js(\App\Support\OrderStatus::labels())).map(([key, label]) => ({ key, label })),
                 ],
+                onlineLabels: @js(\App\Support\OrderStatus::labels()),
+                onlineBadges: @js(\App\Support\OrderStatus::badgeClasses()),
                 modalOpen: false,
                 modalTab: 'refund',
                 modalOrderId: null,
@@ -472,20 +468,10 @@
                     return 'bg-gray-100 text-gray-800 border-gray-200';
                 },
                 onlineStatusLabel(status) {
-                    const map = { pending: 'Pending', processing: 'Packing', shipped: 'Shipped', completed: 'Delivered', cancelled: 'Cancelled', refunded: 'Refunded', returned: 'Returned' };
-                    return map[status] || status;
+                    return this.onlineLabels[status] || status;
                 },
                 onlineStatusClass(status) {
-                    const map = {
-                        pending: 'bg-amber-100 text-amber-800 border-amber-200',
-                        processing: 'bg-blue-100 text-blue-800 border-blue-200',
-                        shipped: 'bg-purple-100 text-purple-800 border-purple-200',
-                        completed: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-                        cancelled: 'bg-orange-100 text-orange-800 border-orange-300 line-through font-black',
-                        refunded: 'bg-rose-100 text-rose-800 border-rose-300 line-through font-black',
-                        returned: 'bg-red-100 text-red-800 border-red-300 line-through font-black',
-                    };
-                    return map[status] || 'bg-gray-100 text-gray-800 border-gray-200';
+                    return this.onlineBadges[status] || 'bg-gray-100 text-gray-800 border-gray-200';
                 },
                 openReturnModal(order) {
                     this.modalOrderId = order.id;

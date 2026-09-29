@@ -13,27 +13,64 @@
             @csrf
             @method('PUT')
 
-            <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div class="border-b border-slate-100 px-5 py-4">
-                    <h2 class="text-sm font-bold text-slate-900">Delivery zones</h2>
-                    <p class="mt-0.5 text-xs text-slate-500">Customer picks Inside / Outside Dhaka at checkout.</p>
-                </div>
-                <div class="grid gap-4 p-5 sm:grid-cols-2">
+            @php
+                $zoneRows = old('zones', $zones->map(fn ($z) => [
+                    'id' => $z->id, 'name' => $z->name, 'code' => $z->code, 'fee' => (float) $z->fee,
+                    'note' => $z->note, 'is_active' => $z->is_active,
+                ])->values()->all());
+                $defaultZone = old('default_zone', optional($zones->firstWhere('is_default', true))->code ?? optional($zones->first())->code);
+            @endphp
+            <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden"
+                 x-data="{ zones: @js(array_values($zoneRows)), defaultZone: @js($defaultZone), add() { this.zones.push({ id: null, name: '', code: '', fee: 0, note: '', is_active: true }); } }">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-4">
                     <div>
-                        <label class="text-xs font-bold uppercase tracking-wide text-slate-500">Inside Dhaka (৳)</label>
-                        <input type="number" step="0.01" min="0" name="delivery_inside_dhaka"
-                               value="{{ old('delivery_inside_dhaka', $settings->delivery_inside_dhaka ?? 60) }}"
-                               class="mt-1.5 w-full rounded-xl border-slate-200 text-sm" required>
-                        <x-input-error class="mt-1" :messages="$errors->get('delivery_inside_dhaka')" />
+                        <h2 class="text-sm font-bold text-slate-900">Delivery zones</h2>
+                        <p class="mt-0.5 text-xs text-slate-500">Customers pick one of the active zones at checkout and on landing pages.</p>
                     </div>
-                    <div>
-                        <label class="text-xs font-bold uppercase tracking-wide text-slate-500">Outside Dhaka (৳)</label>
-                        <input type="number" step="0.01" min="0" name="delivery_outside_dhaka"
-                               value="{{ old('delivery_outside_dhaka', $settings->delivery_outside_dhaka ?? 120) }}"
-                               class="mt-1.5 w-full rounded-xl border-slate-200 text-sm" required>
-                        <x-input-error class="mt-1" :messages="$errors->get('delivery_outside_dhaka')" />
-                    </div>
+                    <button type="button" @click="add()" class="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100">+ Add zone</button>
                 </div>
+                <x-input-error class="px-5 pt-3" :messages="$errors->get('zones')" />
+                <div class="divide-y divide-slate-100">
+                    <template x-for="(zone, i) in zones" :key="i">
+                        <div class="grid gap-3 p-4 sm:grid-cols-12 sm:items-end" :class="zone.delete ? 'opacity-40' : ''">
+                            <input type="hidden" :name="`zones[${i}][id]`" :value="zone.id ?? ''">
+                            <input type="hidden" :name="`zones[${i}][delete]`" :value="zone.delete ? 1 : 0">
+                            <div class="sm:col-span-3">
+                                <label class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Name</label>
+                                <input type="text" :name="`zones[${i}][name]`" x-model="zone.name" maxlength="80" required placeholder="e.g. Chattogram city"
+                                       class="mt-1 w-full rounded-xl border-slate-200 text-sm">
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Code</label>
+                                <input type="text" :name="`zones[${i}][code]`" x-model="zone.code" maxlength="40" placeholder="auto"
+                                       class="mt-1 w-full rounded-xl border-slate-200 font-mono text-xs" :readonly="!!zone.id">
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Fee (৳)</label>
+                                <input type="number" step="0.01" min="0" :name="`zones[${i}][fee]`" x-model="zone.fee" required
+                                       class="mt-1 w-full rounded-xl border-slate-200 text-sm">
+                            </div>
+                            <div class="sm:col-span-3">
+                                <label class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Note (shown to customer)</label>
+                                <input type="text" :name="`zones[${i}][note]`" x-model="zone.note" maxlength="160" placeholder="e.g. 1–2 days"
+                                       class="mt-1 w-full rounded-xl border-slate-200 text-sm">
+                            </div>
+                            <div class="flex flex-wrap items-center gap-3 sm:col-span-2 sm:justify-end">
+                                <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                                    <input type="checkbox" :name="`zones[${i}][is_active]`" value="1" x-model="zone.is_active" class="rounded border-slate-300 text-indigo-600">
+                                    Active
+                                </label>
+                                <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-600" title="Pre-selected at checkout">
+                                    <input type="radio" name="default_zone" :value="zone.code" x-model="defaultZone" :disabled="!zone.code" class="border-slate-300 text-indigo-600">
+                                    Default
+                                </label>
+                                <button type="button" @click="zone.id ? (zone.delete = !zone.delete) : zones.splice(i, 1)"
+                                        class="text-xs font-bold text-rose-600 hover:underline" x-text="zone.delete ? 'Undo' : 'Remove'"></button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <p class="border-t border-slate-100 px-5 py-3 text-[11px] text-slate-500">Existing orders keep the zone they were placed with. Codes are fixed once saved.</p>
             </div>
 
             <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -94,6 +131,26 @@
                             <x-input-error class="mt-1" :messages="$errors->get('delivery_confirmation_amount')" />
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div class="border-b border-slate-100 px-5 py-4">
+                    <h2 class="text-sm font-bold text-slate-900">Online payment gateways</h2>
+                    <p class="mt-0.5 text-xs text-slate-500">bKash, Nagad and card payments stay off until credentials are added to the server <code>.env</code> and a payment driver is installed.</p>
+                </div>
+                <div class="divide-y divide-slate-100">
+                    @foreach(collect($paymentMethods)->where('type', 'gateway') as $method)
+                        <div class="flex items-center justify-between gap-3 px-5 py-3">
+                            <div>
+                                <p class="text-sm font-bold text-slate-900">{{ $method['label'] }}</p>
+                                <p class="text-[11px] text-slate-500">{{ $method['available'] ? 'Configured' : $method['reason'] }}</p>
+                            </div>
+                            <span class="rounded-full px-2.5 py-0.5 text-[11px] font-bold {{ $method['available'] ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500' }}">
+                                {{ $method['available'] ? 'Ready' : 'Not active' }}
+                            </span>
+                        </div>
+                    @endforeach
                 </div>
             </div>
 

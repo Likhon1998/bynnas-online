@@ -64,6 +64,11 @@ class Customer extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function leads()
+    {
+        return $this->hasMany(Lead::class)->latest();
+    }
+
     /** Match phone allowing formatting differences (spaces, +, dashes). */
     public function scopeWherePhone($query, ?string $phone)
     {

@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\User;
 use App\Services\WebsiteService;
 use App\Support\AuthSession;
+use App\Support\OrderStatus;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -49,11 +50,11 @@ class StorefrontAuthController extends Controller
         ]);
 
         $totalOrders = $orders->count();
-        $packagingOrders = $orders->whereIn('status', ['pending', 'pending_fulfillment', 'processing'])->count();
-        $inTransitOrders = $orders->where('status', 'shipped')->count();
-        $deliveredOrders = $orders->where('status', 'completed')->count();
+        $packagingOrders = $orders->whereIn('status', OrderStatus::expand(OrderStatus::preShipment()))->count();
+        $inTransitOrders = $orders->where('status', OrderStatus::SHIPPED)->count();
+        $deliveredOrders = $orders->whereIn('status', [OrderStatus::DELIVERED, OrderStatus::COMPLETED])->count();
         $activeOrders = $orders
-            ->filter(fn ($order) => in_array($order->status, ['pending', 'pending_fulfillment', 'processing', 'shipped'], true))
+            ->filter(fn ($order) => in_array($order->workflowStatus(), OrderStatus::open(), true))
             ->values();
         $activeOrder = $activeOrders->first() ?? $orders->first();
         $activeTracking = $activeOrder ? ($orderTracking[$activeOrder->id] ?? null) : null;
@@ -74,7 +75,7 @@ class StorefrontAuthController extends Controller
                 'id' => $order->id,
                 'invoice' => $order->invoice_no,
                 'date' => $order->created_at->format('M j, Y'),
-                'status' => $order->status === 'pending_fulfillment' ? 'pending' : $order->status,
+                'status' => OrderStatus::customerStep($order->status),
                 'status_raw' => $order->status,
                 'status_label' => $track['status_label'] ?? ucfirst($order->status),
                 'where' => $track['where_is_product'] ?? '',

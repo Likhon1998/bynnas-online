@@ -52,8 +52,11 @@
             <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2.5 sm:gap-3">
                 <div class="bg-white px-3.5 py-3 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between gap-2">
                     <div class="min-w-0">
-                        <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-0.5">Needs packing</p>
+                        <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-0.5">New · to verify</p>
                         <h3 class="text-xl font-black text-gray-900 leading-none">{{ $pendingCount ?? 0 }}</h3>
+                        @if(($confirmedCount ?? 0) > 0)
+                            <p class="text-[10px] font-semibold text-cyan-700 mt-1">{{ $confirmedCount }} confirmed, not started</p>
+                        @endif
                     </div>
                     <div class="w-9 h-9 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
@@ -61,8 +64,11 @@
                 </div>
                 <div class="bg-white px-3.5 py-3 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between gap-2">
                     <div class="min-w-0">
-                        <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-0.5">Packing now</p>
+                        <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-0.5">Processing / packed</p>
                         <h3 class="text-xl font-black text-gray-900 leading-none">{{ $processingCount ?? 0 }}</h3>
+                        @if(($returnRequestedCount ?? 0) > 0)
+                            <p class="text-[10px] font-semibold text-yellow-700 mt-1">{{ $returnRequestedCount }} return {{ $returnRequestedCount === 1 ? 'request' : 'requests' }}</p>
+                        @endif
                     </div>
                     <div class="w-9 h-9 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center shrink-0 text-base">📦</div>
                 </div>
@@ -105,7 +111,7 @@
                             <div class="px-4 py-3">
                                 <p class="text-[13px] font-bold text-slate-900">{{ $row['name'] }}</p>
                                 <p class="mt-0.5 text-lg font-black text-sky-800">৳{{ $row['amount_fmt'] }}</p>
-                                <p class="text-[11px] text-slate-500">{{ $row['orders'] }} {{ $row['orders'] === 1 ? 'order' : 'orders' }} shipped</p>
+                                <p class="text-[11px] text-slate-500">{{ $row['orders'] }} {{ $row['orders'] === 1 ? 'order' : 'orders' }} with courier</p>
                             </div>
                         @endforeach
                     </div>
@@ -166,10 +172,13 @@
                                         <span class="text-xs font-bold px-2.5 py-1 rounded-full border inline-block"
                                               :class="statusBadgeClass(order.status)"
                                               x-text="statusLabel(order.status)"></span>
-                                        <template x-if="order.status === 'shipped' && order.due_from_courier > 0">
+                                        <template x-if="order.status === 'new'">
+                                            <div class="text-[10px] font-bold text-amber-700 mt-1">Needs verification</div>
+                                        </template>
+                                        <template x-if="order.due_from_courier > 0">
                                             <div class="text-[10px] font-bold text-sky-700 mt-1" x-text="'Due from courier ৳' + order.due_from_courier_fmt"></div>
                                         </template>
-                                        <template x-if="order.status === 'shipped' && order.shipping_courier">
+                                        <template x-if="['shipped', 'delivered'].includes(order.status) && order.shipping_courier">
                                             <div>
                                                 <p class="text-[10px] text-purple-700 font-bold mt-1" x-text="order.shipping_courier"></p>
                                                 <p class="text-[10px] text-gray-500 font-mono" x-show="order.shipping_tracking_no" x-text="order.shipping_tracking_no"></p>
@@ -214,50 +223,26 @@
                 search: initialSearch || '',
                 status: initialStatus && initialStatus !== '' ? initialStatus : 'all',
                 date: initialDate || '',
-                statusTabs: [
-                    { key: 'all', label: 'All' },
-                    { key: 'pending', label: 'Pending' },
-                    { key: 'processing', label: 'Packing' },
-                    { key: 'shipped', label: 'Shipped' },
-                    { key: 'completed', label: 'Delivered' },
-                ],
+                labels: @js($statusLabels ?? []),
+                badges: @js($statusBadges ?? []),
+                get statusTabs() {
+                    return [{ key: 'all', label: 'All' }]
+                        .concat(Object.entries(this.labels).map(([key, label]) => ({ key, label })));
+                },
                 get filteredOrders() {
                     const q = (this.search || '').trim().toLowerCase();
+                    const wanted = this.status === 'pending' ? 'new' : this.status;
                     return this.allOrders.filter((order) => {
-                        if (this.status === 'pending') {
-                            if (!['pending', 'pending_fulfillment'].includes(order.status)) return false;
-                        } else if (this.status !== 'all' && order.status !== this.status) {
-                            return false;
-                        }
+                        if (wanted !== 'all' && order.status !== wanted) return false;
                         if (!q) return true;
                         return (order.search_blob || '').includes(q);
                     });
                 },
                 statusLabel(status) {
-                    const map = {
-                        pending: 'Pending',
-                        pending_fulfillment: 'Pending',
-                        processing: 'Processing',
-                        shipped: 'Shipped',
-                        completed: 'Completed',
-                        cancelled: 'Cancelled',
-                        returned: 'Returned',
-                        refunded: 'Refunded',
-                    };
-                    return map[status] || (status ? status.charAt(0).toUpperCase() + status.slice(1) : '');
+                    return this.labels[status] || (status ? status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ') : '');
                 },
                 statusBadgeClass(status) {
-                    const map = {
-                        pending: 'bg-amber-100 text-amber-800 border-amber-200',
-                        pending_fulfillment: 'bg-amber-100 text-amber-800 border-amber-200',
-                        processing: 'bg-blue-100 text-blue-800 border-blue-200',
-                        shipped: 'bg-purple-100 text-purple-800 border-purple-200',
-                        completed: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-                        cancelled: 'bg-orange-100 text-orange-800 border-orange-300 line-through decoration-orange-600 decoration-2 font-black',
-                        returned: 'bg-red-100 text-red-800 border-red-300 line-through decoration-red-600 decoration-2 font-black',
-                        refunded: 'bg-rose-100 text-rose-800 border-rose-300 line-through decoration-rose-600 decoration-2 font-black',
-                    };
-                    return map[status] || 'bg-gray-100 text-gray-800 border-gray-200';
+                    return this.badges[status] || 'bg-gray-100 text-gray-800 border-gray-200';
                 },
                 applyDate() {
                     const params = new URLSearchParams();

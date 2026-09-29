@@ -249,6 +249,7 @@
                             <th class="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider">Value</th>
                             <th class="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-center" title="Show in homepage New Arrivals">New</th>
                             <th class="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-center" title="Show in homepage Trending">Trend</th>
+                            <th class="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-center" title="Combo pack (homepage Combo Deals)">Combo</th>
                             <th class="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-center">Status</th>
                             <th class="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-right">Actions</th>
                         </tr>
@@ -352,6 +353,13 @@
                                            @change="toggleHomepageFlag({{ $product->id }}, 'is_best_seller', $event.target.checked, $event.target)">
                                 </td>
                                 <td class="px-2.5 py-2.5 align-middle text-center">
+                                    <input type="checkbox"
+                                           class="h-3.5 w-3.5 rounded border-amber-300 text-amber-500 focus:ring-amber-500 cursor-pointer"
+                                           title="Combo pack"
+                                           @checked($product->is_combo)
+                                           @change="toggleHomepageFlag({{ $product->id }}, 'is_combo', $event.target.checked, $event.target)">
+                                </td>
+                                <td class="px-2.5 py-2.5 align-middle text-center">
                                     @if($isOut)
                                         <span class="inline-flex px-2 py-px text-[10px] font-semibold rounded-full bg-rose-50 text-[var(--pl-sale)] border border-rose-100">Out</span>
                                     @elseif($isLow)
@@ -388,7 +396,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="11" class="px-4 py-12 text-center">
+                                <td colspan="12" class="px-4 py-12 text-center">
                                     <p class="text-[12px] font-medium text-slate-800">No products found</p>
                                     <p class="text-[11px] text-slate-500 mt-1 mb-2">Try clearing filters or add a new product.</p>
                                     <a href="{{ route('products.create') }}" class="text-[12px] font-medium text-indigo-600 hover:text-indigo-700">Add your first product →</a>

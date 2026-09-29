@@ -276,11 +276,14 @@
                     <div>
                         <span class="block text-[12px] font-bold uppercase tracking-wide text-slate-500">Delivery area</span>
                         <div class="mt-1.5 grid grid-cols-2 gap-2">
-                            @foreach(['inside_dhaka' => 'Inside Dhaka', 'outside_dhaka' => 'Outside Dhaka'] as $zoneKey => $zoneLabel)
-                                <label class="cursor-pointer rounded-xl border-2 p-3 text-center" :class="zone === '{{ $zoneKey }}' ? 'lp-accent-border bg-slate-50' : 'border-slate-200'">
-                                    <input type="radio" name="delivery_zone" value="{{ $zoneKey }}" x-model="zone" class="sr-only">
-                                    <span class="block text-[14px] font-bold text-slate-900">{{ $zoneLabel }}</span>
-                                    <span class="block text-[12px] text-slate-500">{{ $currency }}{{ format_taka_number($deliveryConfig[$zoneKey] ?? 0) }}</span>
+                            @foreach($deliveryConfig['zones'] ?? [] as $zoneRow)
+                                <label class="cursor-pointer rounded-xl border-2 p-3 text-center" :class="zone === @js($zoneRow['code']) ? 'lp-accent-border bg-slate-50' : 'border-slate-200'">
+                                    <input type="radio" name="delivery_zone" value="{{ $zoneRow['code'] }}" x-model="zone" class="sr-only">
+                                    <span class="block text-[14px] font-bold text-slate-900">{{ $zoneRow['name'] }}</span>
+                                    <span class="block text-[12px] text-slate-500">{{ $currency }}{{ format_taka_number($zoneRow['fee']) }}</span>
+                                    @if(! empty($zoneRow['note']))
+                                        <span class="block text-[11px] text-slate-400">{{ $zoneRow['note'] }}</span>
+                                    @endif
                                 </label>
                             @endforeach
                         </div>
@@ -359,7 +362,7 @@
             offerKey: @json($initialKey),
             variantId: null,
             qty: Math.max(1, Number(@json((int) old('qty', 1))) || 1),
-            zone: @json(old('delivery_zone', 'inside_dhaka')),
+            zone: @json(old('delivery_zone', $deliveryConfig['default_zone'] ?? 'inside_dhaka')),
             payment: @json(old('payment_method', ($deliveryConfig['cod_enabled'] ?? true) ? 'cash_on_delivery' : 'confirmation_charge')),
             submitting: false,
             expired: false,
@@ -384,7 +387,9 @@
             get subtotal() { return this.variant ? this.variant.price * this.qty : 0; },
             get deliveryFee() {
                 if (cfg.free_enabled && this.subtotal >= Number(cfg.free_min_amount)) return 0;
-                return Number(this.zone === 'outside_dhaka' ? cfg.outside_dhaka : cfg.inside_dhaka) || 0;
+                const zones = Array.isArray(cfg.zones) ? cfg.zones : [];
+                const row = zones.find((z) => z.code === this.zone) || zones.find((z) => z.is_default) || zones[0];
+                return Number(row ? row.fee : 0) || 0;
             },
             selectVariant(preferred) {
                 const list = this.current ? this.current.variants : [];

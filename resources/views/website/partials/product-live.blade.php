@@ -193,6 +193,20 @@
             </div>
         @endif
 
+        @if($product->is_combo)
+            @php $comboItems = $product->comboItemList(); @endphp
+            <div class="pd-combo">
+                <p class="pd-combo-title">🎁 Combo pack{{ $comboItems ? ' — what’s inside' : '' }}</p>
+                @if($comboItems)
+                    <ul class="pd-combo-list">
+                        @foreach($comboItems as $item)
+                            <li>{{ $item }}</li>
+                        @endforeach
+                    </ul>
+                @endif
+            </div>
+        @endif
+
         @php
             $availableQty = max(0, (int) $product->availableStock());
             $cartItem = [
@@ -270,6 +284,8 @@
                 </button>
             @endif
         </div>
+
+        @include('website.partials.product-share')
 
         <div class="pd-trust">
             @foreach([

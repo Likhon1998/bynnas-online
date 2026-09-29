@@ -215,7 +215,7 @@ class DashboardController extends Controller
         if ($isAdmin && $filterCounterId === null) {
             $pendingOnlineOrders = (int) Order::where('shop_id', $shopId)
                 ->onlineOrders()
-                ->whereIn('status', ['pending', 'pending_fulfillment'])
+                ->whereIn('status', \App\Support\OrderStatus::newValues())
                 ->count();
         }
 

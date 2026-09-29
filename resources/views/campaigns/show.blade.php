@@ -102,7 +102,7 @@
                                             <td class="px-4 py-2"><a href="{{ route('online-orders.show', $order) }}" class="font-semibold text-indigo-600 hover:underline">{{ $order->invoice_no }}</a><div class="text-[11px] text-slate-400">{{ $order->created_at?->format('d M, h:i A') }}</div></td>
                                             <td class="px-4 py-2">{{ $order->customer->name ?? 'Guest' }}</td>
                                             <td class="px-4 py-2 font-mono text-[11px]">{{ $order->utm_content ?: '—' }}</td>
-                                            <td class="px-4 py-2">{{ \Illuminate\Support\Str::headline((string) $order->status) }}</td>
+                                            <td class="px-4 py-2">{{ \App\Support\OrderStatus::label($order->status) }}</td>
                                             <td class="px-4 py-2 text-right tabular-nums">৳{{ format_taka_number($order->total_amount) }}</td>
                                         </tr>
                                     @endforeach

@@ -30,10 +30,12 @@
         <span class="gaget-discount-badge">-{{ $discount }}%</span>
     @elseif($isNew)
         <span class="gs-badge-new">New</span>
+    @elseif($product->is_best_seller)
+        <span class="gs-badge-new gs-badge-best">Best Seller</span>
     @endif
 
     <a href="{{ route('website.product', $product) }}" class="gaget-product-img">
-        <img src="{{ $img }}" alt="{{ $displayName }}" loading="lazy">
+        <img src="{{ $img }}" alt="{{ $displayName }}" class="bb-fill" loading="lazy">
     </a>
 
     <div class="gaget-product-body">

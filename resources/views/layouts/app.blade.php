@@ -315,6 +315,65 @@
     </div>
 
     <script>
+        function staffAlertBell(feedUrl, readAllUrl) {
+            const csrf = () => document.querySelector('meta[name="csrf-token"]').content;
+            const post = (url) => fetch(url, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf() },
+                credentials: 'same-origin',
+                keepalive: true,
+            });
+            return {
+                panelOpen: false,
+                loading: false,
+                unread: 0,
+                items: [],
+                init() {
+                    this.load();
+                    setInterval(() => this.load(), 60000);
+                },
+                async load() {
+                    this.loading = true;
+                    try {
+                        const res = await fetch(feedUrl, {
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                            credentials: 'same-origin',
+                        });
+                        if (!res.ok) return;
+                        const data = await res.json();
+                        this.items = data.items || [];
+                        this.unread = Number(data.unread || 0);
+                    } catch (e) {
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                toggle() {
+                    this.panelOpen = !this.panelOpen;
+                    if (this.panelOpen) this.load();
+                },
+                async open(item, event) {
+                    event.preventDefault();
+                    if (item.is_new) {
+                        try { await post(item.read_url); } catch (e) {}
+                    }
+                    if (item.url) {
+                        window.location.href = item.url;
+                    } else {
+                        this.load();
+                    }
+                },
+                async readAll() {
+                    try {
+                        const res = await post(readAllUrl);
+                        if (!res.ok) return;
+                        this.items = this.items.map((item) => ({ ...item, is_new: false }));
+                        this.unread = 0;
+                    } catch (e) {}
+                },
+            };
+        }
+
         function onlineOrderBell(listUrl, seenUrl) {
             return {
                 panelOpen: false,

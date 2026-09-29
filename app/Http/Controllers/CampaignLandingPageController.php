@@ -120,7 +120,7 @@ class CampaignLandingPageController extends Controller
             'reviews' => $reviews,
             'isPreview' => $isPreview,
             'settings' => SiteSetting::current(),
-            'deliveryConfig' => $this->delivery->publicConfig(),
+            'deliveryConfig' => $this->delivery->publicConfig(null, (int) $page->shop_id),
             'ws' => $this->website,
         ]);
     }
@@ -136,8 +136,8 @@ class CampaignLandingPageController extends Controller
             'customer_name' => 'required|string|min:2|max:120',
             'customer_phone' => ['required', 'string', 'max:20', 'regex:/^\+?[0-9\s\-]{8,20}$/'],
             'customer_address' => 'required|string|min:5|max:1000',
-            'delivery_zone' => 'nullable|string|in:inside_dhaka,outside_dhaka',
-            'payment_method' => 'nullable|string|in:cash_on_delivery,confirmation_charge',
+            'delivery_zone' => ['nullable', 'string', Rule::in($this->delivery->zoneCodes((int) $page->shop_id))],
+            'payment_method' => ['nullable', 'string', Rule::in($this->delivery->allowedPaymentMethods())],
             'note' => 'nullable|string|max:500',
             'website' => 'nullable|size:0',
         ], [

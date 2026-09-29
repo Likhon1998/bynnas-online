@@ -178,9 +178,9 @@ class WebsiteService
                 ->orderByDesc('is_best_seller')
                 ->orderByDesc('review_count')
                 ->latest()
-                ->take(24)
+                ->take(48)
                 ->get(),
-            10
+            16
         );
 
         $flashSaleProducts = $this->dedupeVariantCollection(
@@ -188,9 +188,9 @@ class WebsiteService
                 ->with(['category', 'brand'])
                 ->onSale()
                 ->orderByRaw('(selling_price - sale_price) / NULLIF(selling_price, 0) DESC')
-                ->take(24)
+                ->take(48)
                 ->get(),
-            6
+            16
         );
 
         $flashSaleEndsAt = $flashSaleProducts
@@ -206,7 +206,17 @@ class WebsiteService
                 ->latest('id')
                 ->take(24)
                 ->get(),
-            6
+            8
+        );
+
+        $comboProducts = $this->dedupeVariantCollection(
+            $this->catalogQuery($shopId)
+                ->with(['category', 'brand'])
+                ->combos()
+                ->latest('id')
+                ->take(24)
+                ->get(),
+            8
         );
 
         // Trending = best sellers (same CMS product flags) — keep one source of truth
@@ -267,6 +277,7 @@ class WebsiteService
             'flashSaleProducts' => $flashSaleProducts,
             'flashSaleEndsAt' => $flashSaleEndsAt,
             'newArrivals' => $newArrivals,
+            'comboProducts' => $comboProducts,
             'trendingProducts' => $trendingProducts,
             'brands' => $brands,
             'mainNav' => NavigationLink::where('shop_id', $shopId)->where('location', 'main_nav')->where('is_active', true)->orderBy('sort_order')->get(),
@@ -294,6 +305,7 @@ class WebsiteService
             'flashSaleProducts' => collect(),
             'flashSaleEndsAt' => null,
             'newArrivals' => collect(),
+            'comboProducts' => collect(),
             'trendingProducts' => collect(),
             'brands' => collect(),
             'mainNav' => collect(),

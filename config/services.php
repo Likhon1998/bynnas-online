@@ -28,6 +28,11 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Optional: enables the desktop "Send in Messenger" dialog for product sharing.
+    'facebook' => [
+        'app_id' => env('FACEBOOK_APP_ID'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

@@ -247,6 +247,8 @@ class ProductController extends Controller
                     'is_new_arrival' => $request->boolean('is_new_arrival'),
                     'is_best_seller' => $request->boolean('is_best_seller'),
                     'is_featured' => $request->boolean('is_featured'),
+                    'is_combo' => $request->boolean('is_combo'),
+                    'combo_items' => $request->boolean('is_combo') ? ($validated['combo_items'] ?? null) : null,
                 ];
                 $shared = $this->normalizeVariantFields($this->applyBrandData($shared));
 
@@ -426,6 +428,8 @@ class ProductController extends Controller
             'is_new_arrival' => $request->boolean('is_new_arrival'),
             'is_best_seller' => $request->boolean('is_best_seller'),
             'is_featured' => $request->boolean('is_featured'),
+            'is_combo' => $request->boolean('is_combo'),
+            'combo_items' => $request->boolean('is_combo') ? ($validated['combo_items'] ?? null) : null,
         ];
         if (retail_enabled()) {
             $data['requires_imei'] = $request->boolean('requires_imei');
@@ -496,6 +500,8 @@ class ProductController extends Controller
             'is_new_arrival' => 'nullable|boolean',
             'is_best_seller' => 'nullable|boolean',
             'is_featured' => 'nullable|boolean',
+            'is_combo' => 'nullable|boolean',
+            'combo_items' => 'nullable|string|max:2000',
             'alert_quantity' => 'nullable|integer|min:0',
         ];
     }
@@ -559,7 +565,7 @@ class ProductController extends Controller
         }
 
         $validated = $request->validate([
-            'flag' => 'required|in:is_new_arrival,is_best_seller',
+            'flag' => 'required|in:is_new_arrival,is_best_seller,is_combo',
             'value' => 'required|boolean',
         ]);
 
@@ -572,6 +578,7 @@ class ProductController extends Controller
             'value' => (bool) $product->{$flag},
             'is_new_arrival' => (bool) $product->is_new_arrival,
             'is_best_seller' => (bool) $product->is_best_seller,
+            'is_combo' => (bool) $product->is_combo,
         ]);
     }
 

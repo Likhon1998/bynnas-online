@@ -334,8 +334,28 @@ Route::middleware([
     Route::post('/online-orders/notifications/seen', [OnlineOrderController::class, 'markNotificationsSeen'])->name('online-orders.notifications.seen');
     Route::get('/online-orders/{order}', [OnlineOrderController::class, 'show'])->name('online-orders.show');
     Route::post('/online-orders/{order}/status', [OnlineOrderController::class, 'updateStatus'])->name('online-orders.update-status');
+    Route::post('/online-orders/{order}/verify', [OnlineOrderController::class, 'verify'])->name('online-orders.verify');
     Route::post('/online-orders/{order}/cancel', [OrderCancellationController::class, 'cancel'])->name('online-orders.cancel');
     Route::post('/online-orders/{order}/collect-from-courier', [OnlineOrderController::class, 'collectFromCourier'])->name('online-orders.collect-from-courier');
+
+    Route::middleware('can:manage leads')->group(function () {
+        Route::resource('leads', \App\Http\Controllers\LeadController::class);
+        Route::post('/leads/{lead}/status', [\App\Http\Controllers\LeadController::class, 'updateStatus'])->name('leads.status');
+        Route::post('/leads/{lead}/assign', [\App\Http\Controllers\LeadController::class, 'assign'])->name('leads.assign');
+        Route::post('/leads/{lead}/activity', [\App\Http\Controllers\LeadController::class, 'logActivity'])->name('leads.activity');
+        Route::post('/leads/{lead}/convert-customer', [\App\Http\Controllers\LeadController::class, 'convertToCustomer'])->name('leads.convert-customer');
+        Route::post('/leads/{lead}/convert-order', [\App\Http\Controllers\LeadController::class, 'convertToOrder'])->name('leads.convert-order');
+
+        Route::get('/abandoned-carts', [\App\Http\Controllers\AbandonedCartController::class, 'index'])->name('abandoned-carts.index');
+        Route::get('/abandoned-carts/{abandonedCart}', [\App\Http\Controllers\AbandonedCartController::class, 'show'])->name('abandoned-carts.show');
+        Route::post('/abandoned-carts/{abandonedCart}/status', [\App\Http\Controllers\AbandonedCartController::class, 'updateStatus'])->name('abandoned-carts.status');
+        Route::post('/abandoned-carts/{abandonedCart}/lead', [\App\Http\Controllers\AbandonedCartController::class, 'createLead'])->name('abandoned-carts.lead');
+    });
+
+    Route::get('/notifications', [\App\Http\Controllers\StaffNotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications/feed', [\App\Http\Controllers\StaffNotificationController::class, 'feed'])->name('notifications.feed');
+    Route::post('/notifications/read-all', [\App\Http\Controllers\StaffNotificationController::class, 'readAll'])->name('notifications.read-all');
+    Route::post('/notifications/{notification}/read', [\App\Http\Controllers\StaffNotificationController::class, 'read'])->name('notifications.read');
 });
 
 require __DIR__.'/auth.php';

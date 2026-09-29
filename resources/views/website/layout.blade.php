@@ -6,7 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
         // Available before Vite loads — prevents CSRF mismatch on fast register/login/checkout.
         (function () {
@@ -78,8 +78,6 @@
         @endif
     @endif
     @include('partials.favicon', ['settings' => $settings ?? null])
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet" />
     @php
         $storefrontUser = auth('web')->check() && auth('web')->user()->isStorefrontCustomer()
             ? [
@@ -94,6 +92,8 @@
                 $deliveryConfig = app(\App\Services\DeliveryChargeService::class)->publicConfig();
             } catch (\Throwable $e) {
                 $deliveryConfig = [
+                    'zones' => [['code' => 'inside_dhaka', 'name' => 'Inside Dhaka', 'fee' => 60, 'note' => null, 'is_default' => true]],
+                    'default_zone' => 'inside_dhaka',
                     'inside_dhaka' => 60,
                     'outside_dhaka' => 120,
                     'free_enabled' => true,
@@ -214,8 +214,12 @@
                     name: @json(data_get($storefrontUser, 'name', '')),
                     phone: @json(data_get($storefrontUser, 'phone', '')),
                     address: @json(data_get($storefrontUser, 'address', '')),
-                    zone: 'inside_dhaka',
+                    zone: @json($deliveryConfig['default_zone'] ?? 'inside_dhaka'),
                     payment_method: 'cash_on_delivery',
+                },
+                get deliveryZones() {
+                    const zones = (this.deliveryConfig || {}).zones;
+                    return Array.isArray(zones) && zones.length ? zones : [];
                 },
                 authLogin: { email: '', password: '' },
                 authRegister: { name: '', phone: '', email: '', password: '', address: '' },
@@ -224,10 +228,13 @@
                 get deliveryQuote() {
                     const cfg = this.deliveryConfig || {};
                     const subtotal = Number(this.cartTotal) || 0;
-                    const zone = this.checkout.zone === 'outside_dhaka' ? 'outside_dhaka' : 'inside_dhaka';
-                    const base = zone === 'outside_dhaka'
-                        ? Number(cfg.outside_dhaka) || 0
-                        : Number(cfg.inside_dhaka) || 0;
+                    const zones = this.deliveryZones;
+                    const zoneRow = zones.find((z) => z.code === this.checkout.zone)
+                        || zones.find((z) => z.is_default)
+                        || zones[0]
+                        || { code: this.checkout.zone, name: '', fee: 0 };
+                    const zone = zoneRow.code;
+                    const base = Number(zoneRow.fee) || 0;
                     const freeMin = Number(cfg.free_min_amount) || 0;
                     const isFree = !!cfg.free_enabled && subtotal + 0.009 >= freeMin;
                     const deliveryFee = isFree ? 0 : Math.max(0, base);
@@ -242,7 +249,7 @@
                         : 0;
                     return {
                         zone,
-                        zoneLabel: zone === 'outside_dhaka' ? 'Outside Dhaka' : 'Inside Dhaka',
+                        zoneLabel: zoneRow.name,
                         subtotal,
                         baseFee: base,
                         deliveryFee,
@@ -293,8 +300,19 @@
                     if (!payload.length) {
                         this.cart = [];
                         this.save();
+                        if (localStorage.getItem('bs_cart_synced')) {
+                            localStorage.removeItem('bs_cart_synced');
+                            this.csrfFetch(this.cartSyncUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                                body: JSON.stringify({ items: [] }),
+                            }).catch(() => {});
+                        }
                         return;
                     }
+
+                    const phone = String(this.checkout?.phone || '').trim();
+                    const contact = phone ? { name: String(this.checkout?.name || '').trim(), phone } : undefined;
 
                     this.cartSyncing = true;
                     try {
@@ -304,8 +322,9 @@
                                 'Content-Type': 'application/json',
                                 'Accept': 'application/json',
                             },
-                            body: JSON.stringify({ items: payload }),
+                            body: JSON.stringify({ items: payload, contact }),
                         });
+                        localStorage.setItem('bs_cart_synced', '1');
                         const data = await res.json().catch(() => ({}));
                         if (!res.ok) {
                             if (!silent) this.flashToast(data.message || 'Could not refresh cart prices.');
@@ -583,6 +602,7 @@
                         return;
                     }
                     if (!this.isLoggedIn) {
+                        this.syncCart({ silent: true });
                         this.checkoutStep = 'auth';
                         this.authTab = 'login';
                         return;
@@ -601,7 +621,7 @@
                                 customer_name: name,
                                 customer_phone: phone,
                                 customer_address: address,
-                                delivery_zone: this.checkout.zone,
+                                delivery_zone: this.deliveryQuote.zone,
                                 payment_method: this.deliveryQuote.paymentMethod,
                             }),
                         });
@@ -732,27 +752,28 @@
             };
         };
     </script>
-    @vite(['resources/css/app.css', 'resources/css/website.css', 'resources/css/website-mobile.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/css/website.css', 'resources/css/website-mobile.css', 'resources/css/website-theme.css', 'resources/js/app.js', 'resources/js/website-lottie.js'])
     <style>
         [x-cloak]{display:none!important}
         /* Critical first-paint loader (before Vite CSS) */
-        .gaget-page-loader{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#fff;opacity:1;visibility:visible;pointer-events:auto;transition:opacity .32s ease,visibility 0s linear 0s}
+        .gaget-page-loader{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#fffaf5;opacity:1;visibility:visible;pointer-events:auto;transition:opacity .32s ease,visibility 0s linear 0s}
         .gaget-page-loader.is-hidden{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .32s ease,visibility 0s linear .32s}
         .gaget-page-loader__inner{display:flex;flex-direction:column;align-items:center;gap:14px}
         .gaget-page-loader__mark{position:relative;width:64px;height:64px;display:grid;place-items:center}
-        .gaget-page-loader__ring{position:absolute;inset:0;border-radius:50%;border:2.5px solid #e2e8f0;border-top-color:#2563eb;animation:gaget-spin .75s linear infinite}
-        .gaget-page-loader__core{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#2563eb,#1d4ed8);color:#fff;font-weight:800;font-size:18px;letter-spacing:-.02em;box-shadow:0 8px 20px rgba(37,99,235,.28)}
-        .gaget-page-loader__text{margin:0;font-size:15px;font-weight:800;letter-spacing:.02em;color:#0f172a}
-        .gaget-page-loader__sub{margin:0;font-size:12px;font-weight:500;color:#64748b}
-        .gaget-page-loader__bar{position:absolute;top:0;left:0;height:2px;width:0;background:linear-gradient(90deg,#2563eb,#38bdf8)}
+        .gaget-page-loader__ring{position:absolute;inset:0;border-radius:50%;border:2.5px solid #f2e6dc;border-top-color:#ec8560;animation:gaget-spin .75s linear infinite}
+        .gaget-page-loader__core{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:#fff;box-shadow:0 8px 20px rgba(139, 111, 214,.22);overflow:hidden}
+        .gaget-page-loader__core .bb-lottie{width:36px;height:36px}
+        .gaget-page-loader__text{margin:0;font-family:'Fredoka','Nunito',sans-serif;font-size:19px;font-weight:600;color:#3a2a24}
+        .gaget-page-loader__sub{margin:0;font-size:12px;font-weight:500;color:#8c776d}
+        .gaget-page-loader__bar{position:absolute;top:0;left:0;height:2px;width:0;background:linear-gradient(90deg,#ec8560,#b39cf0)}
         .gaget-page-loader.is-active:not(.is-hidden) .gaget-page-loader__bar{animation:gaget-bar-run 1.35s ease-in-out infinite}
         @keyframes gaget-spin{to{transform:rotate(360deg)}}
         @keyframes gaget-bar-run{0%{width:0;left:0}45%{width:55%;left:0}100%{width:0;left:100%}}
 
         /* Critical cart fly + drawer animations (always available) */
-        .gaget-cart-flyer{position:fixed;z-index:100060;width:64px;height:64px;margin:0;padding:0;border:0;border-radius:18px;overflow:hidden;pointer-events:none;background:#fff;box-shadow:0 16px 36px rgba(15,23,42,.28),0 0 0 3px rgba(37,99,235,.25);opacity:1;will-change:left,top,transform,opacity}
+        .gaget-cart-flyer{position:fixed;z-index:100060;width:64px;height:64px;margin:0;padding:0;border:0;border-radius:18px;overflow:hidden;pointer-events:none;background:#fff;box-shadow:0 16px 36px rgba(74, 48, 38,.28),0 0 0 3px rgba(236, 133, 96,.25);opacity:1;will-change:left,top,transform,opacity}
         .gaget-cart-flyer img{width:100%;height:100%;object-fit:cover;display:block}
-        .gaget-cart-flyer--plain{display:grid;place-items:center;background:linear-gradient(145deg,#3b82f6,#1d4ed8);color:#fff;font-size:22px;font-weight:800}
+        .gaget-cart-flyer--plain{display:grid;place-items:center;background:linear-gradient(145deg,#9a7fe0,#db6f4a);color:#fff;font-size:22px;font-weight:800}
         .gaget-cart-flyer.is-flying{animation:gaget-fly-cart .9s cubic-bezier(.22,1,.36,1) forwards}
         @keyframes gaget-fly-cart{
             0%{left:var(--fly-x0);top:var(--fly-y0);transform:scale(1) rotate(-8deg);opacity:1}
@@ -765,9 +786,9 @@
         @keyframes gaget-badge-pop{0%{transform:scale(.55)}60%{transform:scale(1.35)}100%{transform:scale(1)}}
         .gaget-cart-shell{position:fixed;inset:0;z-index:120;pointer-events:none}
         .gaget-cart-shell.is-open{pointer-events:auto}
-        .gaget-cart-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.42);opacity:0;visibility:hidden;transition:opacity .28s ease,visibility 0s linear .28s}
+        .gaget-cart-backdrop{position:absolute;inset:0;background:rgba(74, 48, 38,.42);opacity:0;visibility:hidden;transition:opacity .28s ease,visibility 0s linear .28s}
         .gaget-cart-shell.is-open .gaget-cart-backdrop{opacity:1;visibility:visible;transition:opacity .28s ease,visibility 0s}
-        .gaget-cart-panel{position:absolute;top:0;right:0;bottom:0;width:min(100%,400px);background:#fff;display:flex;flex-direction:column;border-radius:0;overflow:hidden;border-left:1px solid #e2e8f0;box-shadow:-18px 0 48px rgba(15,23,42,.12);transform:translate3d(100%,0,0);opacity:1}
+        .gaget-cart-panel{position:absolute;top:0;right:0;bottom:0;width:min(100%,420px);background:#fffaf5;display:flex;flex-direction:column;border-radius:28px 0 0 28px;overflow:hidden;border-left:1px solid #f2e6dc;box-shadow:-18px 0 48px rgba(74, 48, 38,.12);transform:translate3d(100%,0,0);opacity:1}
         .gaget-cart-shell.is-open .gaget-cart-panel{animation:gaget-cart-sheet-in .38s cubic-bezier(.22,1,.36,1) forwards}
         .gaget-cart-shell.is-closing .gaget-cart-panel{animation:gaget-cart-sheet-out .28s ease forwards}
         .gaget-cart-line{opacity:1!important;transform:none}
@@ -777,23 +798,23 @@
         @keyframes gaget-cart-sheet-out{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(100%,0,0)}}
         .tn-product-add.is-adding,.gaget-btn-primary.is-adding,[data-add-to-cart].is-adding{animation:gaget-add-press .45s cubic-bezier(.34,1.45,.64,1)}
         @keyframes gaget-add-press{0%{transform:scale(1)}35%{transform:scale(.92)}70%{transform:scale(1.04)}100%{transform:scale(1)}}
-        /* Fixed floating pill header — padding creates clearance above hero */
-        .gaget-sticky-header{position:fixed!important;top:0;left:0;right:0;width:100%;z-index:80;background:transparent!important;box-shadow:none!important;pointer-events:none;padding:12px 0 18px;box-sizing:border-box;overflow:visible!important}
+        /* Fixed header: announcement strip + flat white bar */
+        .gaget-sticky-header{position:fixed!important;top:0;left:0;right:0;width:100%;z-index:80;background:#fff!important;box-shadow:0 1px 0 #f2e6dc!important;pointer-events:none;padding:0;box-sizing:border-box;overflow:visible!important}
         .gaget-sticky-header>*{pointer-events:auto}
-        .gaget-header-spacer{display:block;width:100%;height:var(--g-header-h,100px);pointer-events:none;background:#f1f5f9}
+        .gaget-header-spacer{display:block;width:100%;height:var(--g-header-h,100px);pointer-events:none;background:#fffaf5}
 
         /* Safety: brand logos must never render at intrinsic SVG/PNG size */
         .gaget-store .tn-brand-logo{height:44px!important;max-height:44px!important;max-width:120px!important;width:auto!important;object-fit:contain!important}
         .gaget-store .tn-brand-logo-frame{height:52px!important;max-width:140px!important;overflow:hidden!important}
         .gaget-store .pd-brand-logo{height:18px!important;max-height:18px!important;max-width:88px!important;width:auto!important;object-fit:contain!important}
-        .tn-footer-credit{border-top:1px solid #e2e8f0;padding:0;text-align:center;background:#eef2f7}
+        .tn-footer-credit{border-top:1px solid #f2e6dc;padding:0;text-align:center;background:#fbf0e7}
         .tn-footer-credit-inner{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 16px;padding:14px 0 max(16px,env(safe-area-inset-bottom))}
-        .tn-footer-copy{margin:0;font-size:12px;font-weight:500;color:#64748b}
-        .powered-by,.powered-by--footer{margin:0;font-size:12px;font-weight:500;letter-spacing:.02em;color:#64748b;text-align:center}
-        .powered-by strong,.powered-by--footer strong{color:#0f172a;font-weight:800}
+        .tn-footer-copy{margin:0;font-size:12px;font-weight:500;color:#8c776d}
+        .powered-by,.powered-by--footer{margin:0;font-size:12px;font-weight:500;letter-spacing:.02em;color:#8c776d;text-align:center}
+        .powered-by strong,.powered-by--footer strong{color:#3a2a24;font-weight:800}
     </style>
 </head>
-<body class="gaget-store bg-white antialiased" id="storefront-root" x-data="storefrontCart()" :class="{ 'is-nav-open': mobileOpen, 'is-cart-open': cartOpen || checkoutOpen }" @keydown.escape.window="cartOpen && closeCart(); checkoutOpen=false; mobileOpen=false; mobileCatsOpen=false; mobileBrandsOpen=false">
+<body class="gaget-store antialiased" id="storefront-root" x-data="storefrontCart()" :class="{ 'is-nav-open': mobileOpen, 'is-cart-open': cartOpen || checkoutOpen }" @keydown.escape.window="cartOpen && closeCart(); checkoutOpen=false; mobileOpen=false; mobileCatsOpen=false; mobileBrandsOpen=false">
 
 {{-- Simple branded page loader --}}
 <div id="gaget-page-loader" class="gaget-page-loader is-active" role="status" aria-live="polite" aria-busy="true" aria-label="Loading">
@@ -801,7 +822,7 @@
     <div class="gaget-page-loader__inner">
         <div class="gaget-page-loader__mark" aria-hidden="true">
             <span class="gaget-page-loader__ring"></span>
-            <span class="gaget-page-loader__core">{{ mb_strtoupper(mb_substr(trim($settings->store_name ?? config('app.name', 'Bynnas Social')) ?: 'B', 0, 1)) }}</span>
+            <span class="gaget-page-loader__core">@include('website.partials.lottie', ['name' => 'bear'])</span>
         </div>
         <p class="gaget-page-loader__text">{{ $settings->store_name ?? config('app.name', 'Bynnas Social') }}</p>
         <p class="gaget-page-loader__sub" id="gaget-loader-msg">Loading</p>
@@ -872,11 +893,11 @@
         <div class="gaget-cart-panel__body">
             <template x-if="cart.length === 0">
                 <div class="gaget-cart-empty">
-                    <div class="gaget-cart-empty__icon" aria-hidden="true">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    <div class="gaget-cart-empty__icon bb-cart-empty-lottie" aria-hidden="true">
+                        @include('website.partials.lottie', ['name' => 'sleepy'])
                     </div>
-                    <p class="gaget-cart-empty__title">Your cart is empty</p>
-                    <p class="gaget-cart-empty__text">Browse the shop and add products you like.</p>
+                    <p class="gaget-cart-empty__title">Your cart is taking a nap</p>
+                    <p class="gaget-cart-empty__text">Wake it up with some cuddly goodies for your little one!</p>
                     <button type="button" class="gaget-btn-primary gaget-cart-empty__cta" @click="closeCart()">Continue shopping</button>
                 </div>
             </template>
@@ -929,8 +950,8 @@
 
 {{-- Checkout: sign in / register / place order (one modal) --}}
 <div x-show="checkoutOpen" x-cloak class="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
-    <div class="absolute inset-0 bg-black/50" @click="checkoutStep !== 'success' && (checkoutOpen=false)"></div>
-    <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-y-auto p-4 sm:p-6"
+    <div class="bb-modal-backdrop absolute inset-0 bg-black/50" @click="checkoutStep !== 'success' && (checkoutOpen=false)"></div>
+    <div class="bb-modal relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[92vh] overflow-y-auto p-4 sm:p-6"
          :class="checkoutStep === 'success' && 'overflow-hidden'">
         <button type="button" x-show="checkoutStep !== 'success'" @click="checkoutOpen=false" class="absolute right-4 top-4 text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
 
@@ -978,7 +999,7 @@
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Phone number <span class="text-rose-500">*</span></label>
-                    <input x-model="checkout.phone" type="tel" required autocomplete="tel" placeholder="01XXXXXXXXX" class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm">
+                    <input x-model="checkout.phone" @change="syncCart({ silent: true })" type="tel" required autocomplete="tel" placeholder="01XXXXXXXXX" class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm">
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Delivery address <span class="text-rose-500">*</span></label>
@@ -995,18 +1016,15 @@
                 <div>
                     <p class="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">Delivery area</p>
                     <div class="grid grid-cols-2 gap-2">
-                        <button type="button" @click="checkout.zone='inside_dhaka'"
-                                class="rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition"
-                                :class="checkout.zone==='inside_dhaka' ? 'border-orange-500 bg-orange-50 text-slate-900 ring-1 ring-orange-200' : 'border-slate-200 bg-white text-slate-600'">
-                            <span class="block">Inside Dhaka</span>
-                            <span class="mt-0.5 block text-[11px] font-medium text-slate-500" x-text="currency+Number(deliveryConfig.inside_dhaka||0).toFixed(0)"></span>
-                        </button>
-                        <button type="button" @click="checkout.zone='outside_dhaka'"
-                                class="rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition"
-                                :class="checkout.zone==='outside_dhaka' ? 'border-orange-500 bg-orange-50 text-slate-900 ring-1 ring-orange-200' : 'border-slate-200 bg-white text-slate-600'">
-                            <span class="block">Outside Dhaka</span>
-                            <span class="mt-0.5 block text-[11px] font-medium text-slate-500" x-text="currency+Number(deliveryConfig.outside_dhaka||0).toFixed(0)"></span>
-                        </button>
+                        <template x-for="zone in deliveryZones" :key="zone.code">
+                            <button type="button" @click="checkout.zone = zone.code"
+                                    class="rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition"
+                                    :class="deliveryQuote.zone === zone.code ? 'border-orange-500 bg-orange-50 text-slate-900 ring-1 ring-orange-200' : 'border-slate-200 bg-white text-slate-600'">
+                                <span class="block" x-text="zone.name"></span>
+                                <span class="mt-0.5 block text-[11px] font-medium text-slate-500" x-text="currency + Number(zone.fee || 0).toFixed(0)"></span>
+                                <span x-show="zone.note" class="mt-0.5 block text-[10px] font-medium text-slate-400" x-text="zone.note"></span>
+                            </button>
+                        </template>
                     </div>
                 </div>
 
@@ -1066,10 +1084,8 @@
             <div class="gaget-order-success__burst" aria-hidden="true">
                 <span></span><span></span><span></span><span></span><span></span><span></span>
             </div>
-            <div class="gaget-order-success__check mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-                </svg>
+            <div class="gaget-order-success__check bb-success-lottie mx-auto mb-3">
+                @include('website.partials.lottie', ['name' => 'party'])
             </div>
             <h3 class="text-xl font-extrabold text-slate-900">Order placed successfully!</h3>
             <p class="mt-2 text-sm text-slate-500">Thank you — your order is confirmed.</p>

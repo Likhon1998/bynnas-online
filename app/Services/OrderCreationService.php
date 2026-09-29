@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Events\OrderPlaced;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\OrderStatus;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -25,7 +27,7 @@ class OrderCreationService
     /**
      * @param  array{name: string, phone: string, address: string, email?: ?string}  $contact
      * @param  list<array{id: int|string, qty: int|string}>  $items
-     * @param  array{zone?: ?string, payment_method?: ?string, attribution?: array, landing_page_id?: ?int, note?: ?string}  $options
+     * @param  array{zone?: ?string, payment_method?: ?string, attribution?: array, landing_page_id?: ?int, lead_id?: ?int, note?: ?string, context?: array}  $options
      * @return array{order: Order, quote: array, message: string}
      *
      * @throws OrderCreationException
@@ -34,7 +36,7 @@ class OrderCreationService
     {
         $lines = $this->resolveLines($shopId, $items);
         $subtotal = array_sum(array_column($lines, 'subtotal'));
-        $quote = $this->delivery->quote($subtotal, $options['zone'] ?? null, $options['payment_method'] ?? null);
+        $quote = $this->delivery->quote($subtotal, $options['zone'] ?? null, $options['payment_method'] ?? null, null, $shopId);
         $address = trim(preg_replace('/\s+/u', ' ', (string) $contact['address']) ?? '');
         $contact['address'] = $address;
 
@@ -64,9 +66,10 @@ class OrderCreationService
                 'confirmation_charge' => $quote['confirmation_amount'],
                 'paid_amount' => $quote['amount_paid_now'],
                 'payment_method' => $quote['payment_method'],
-                'status' => 'pending_fulfillment',
+                'status' => OrderStatus::NEW,
                 'counter_id' => null,
                 'landing_page_id' => $options['landing_page_id'] ?? null,
+                'lead_id' => $options['lead_id'] ?? null,
             ], $options['attribution'] ?? []));
 
             foreach ($lines as $line) {
@@ -87,6 +90,8 @@ class OrderCreationService
 
             return $order;
         });
+
+        event(new OrderPlaced($order, $options['context'] ?? []));
 
         return ['order' => $order, 'quote' => $quote, 'message' => $this->confirmationMessage($order, $quote)];
     }

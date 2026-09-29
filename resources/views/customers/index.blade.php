@@ -1,8 +1,13 @@
 <x-app-layout>
     @php
         $retail = retail_enabled();
-        $customerRows = $customers->map(function ($c) {
+        $segmentLabels = \App\Services\CustomerSegmentService::SEGMENTS;
+        $segmentBadges = \App\Services\CustomerSegmentService::BADGES;
+        $customerRows = $customers->map(function ($c) use ($segmentMap) {
             return [
+                'segments' => $segmentMap[$c->id] ?? [],
+                'spent_fmt' => format_taka_number((float) ($c->seg_spent ?? 0)),
+                'show' => route('customers.show', $c),
                 'id' => $c->id,
                 'name' => $c->name,
                 'email' => $c->email,
@@ -28,6 +33,8 @@
             onlineCount: {{ (int) $onlineCount }},
             offlineCount: {{ (int) $offlineCount }},
             csrf: @js(csrf_token()),
+            segmentLabels: @js($segmentLabels),
+            segmentBadges: @js($segmentBadges),
          })">
 
         @if (session('success'))
@@ -70,6 +77,13 @@
                     </button>
                 </div>
 
+                <select x-model="segment" class="rounded-lg border-slate-200 bg-slate-50 py-1 text-[12px] text-slate-700" title="Customer segment">
+                    <option value="">All segments</option>
+                    @foreach($segmentLabels as $key => $label)
+                        <option value="{{ $key }}">{{ $label }} ({{ $segmentCounts[$key] ?? 0 }})</option>
+                    @endforeach
+                </select>
+
                 <div class="relative ml-auto w-full min-w-[180px] sm:w-64 sm:max-w-xs">
                     <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                     <input type="search" x-model="q" placeholder="Search name, phone, email…"
@@ -102,12 +116,17 @@
                                              x-text="c.initials"></div>
                                         <div class="min-w-0">
                                             <div class="flex flex-wrap items-center gap-1.5">
-                                                <p class="truncate text-[13px] font-semibold text-slate-900" x-text="c.name"></p>
+                                                <a :href="c.show" class="truncate text-[13px] font-semibold text-slate-900 hover:text-indigo-700" x-text="c.name"></a>
                                                 <span class="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
                                                       :class="c.channel === 'online' ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-700'"
                                                       x-text="c.channel === 'online' ? 'Online' : 'Offline'"></span>
                                             </div>
-                                            <p class="mt-0.5 text-[10px] text-slate-400">Joined <span x-text="c.joined"></span></p>
+                                            <p class="mt-0.5 text-[10px] text-slate-400">Joined <span x-text="c.joined"></span> · spent Tk <span x-text="c.spent_fmt"></span></p>
+                                            <div class="mt-0.5 flex flex-wrap gap-1" x-show="c.segments.length">
+                                                <template x-for="s in c.segments" :key="s">
+                                                    <span class="inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold" :class="segmentBadges[s]" x-text="segmentLabels[s]"></span>
+                                                </template>
+                                            </div>
                                         </div>
                                     </div>
                                 </td>
@@ -170,19 +189,23 @@
     </div>
 
     <script>
-    function customerDirectory({ rows, onlineCount, offlineCount, csrf }) {
+    function customerDirectory({ rows, onlineCount, offlineCount, csrf, segmentLabels, segmentBadges }) {
         return {
             rows: rows || [],
             onlineCount,
             offlineCount,
             csrf,
+            segmentLabels,
+            segmentBadges,
             tab: 'all',
+            segment: '',
             q: '',
             get filtered() {
                 const q = this.q.trim().toLowerCase();
                 return this.rows.filter((c) => {
                     if (this.tab === 'online' && c.channel !== 'online') return false;
                     if (this.tab === 'offline' && c.channel !== 'offline') return false;
+                    if (this.segment && !c.segments.includes(this.segment)) return false;
                     if (!q) return true;
                     const hay = `${c.name || ''} ${c.phone || ''} ${c.email || ''} ${c.address || ''}`.toLowerCase();
                     return hay.includes(q);

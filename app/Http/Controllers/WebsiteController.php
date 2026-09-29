@@ -22,6 +22,8 @@ class WebsiteController extends Controller
         private OnlineOrderTrackingService $tracking,
         private OrderCreationService $orders,
         private CampaignAttributionService $attribution,
+        private \App\Services\DeliveryChargeService $delivery,
+        private \App\Services\AbandonedCartService $carts,
     ) {}
 
     public function home()
@@ -72,6 +74,8 @@ class WebsiteController extends Controller
             $query->onSale();
         } elseif ($request->filter === 'new') {
             $query->newArrivals();
+        } elseif ($request->filter === 'combo') {
+            $query->combos();
         } elseif (in_array($request->filter, ['bestsellers', 'best'], true)) {
             $query->trending()->orderByDesc('review_count');
         }
@@ -94,6 +98,7 @@ class WebsiteController extends Controller
         $pageTitle = match ($request->filter) {
             'deals' => 'Deals',
             'new' => 'New Arrivals',
+            'combo' => 'Combo Deals',
             'bestsellers', 'best' => 'Best Sellers',
             default => 'Shop',
         };
@@ -703,6 +708,8 @@ class WebsiteController extends Controller
             ->values();
 
         if ($requested->isEmpty()) {
+            $this->recordCart($request, $shopId, [], 0);
+
             return response()->json(['items' => [], 'subtotal' => 0.0, 'warnings' => []]);
         }
 
@@ -746,6 +753,8 @@ class WebsiteController extends Controller
             $subtotal += $unitPrice * $qty;
         }
 
+        $this->recordCart($request, $shopId, $lines, $subtotal);
+
         return response()->json([
             'items' => $lines,
             'subtotal' => round($subtotal),
@@ -769,8 +778,8 @@ class WebsiteController extends Controller
             'customer_name' => 'required|string|min:2|max:255',
             'customer_phone' => 'required|string|min:8|max:20',
             'customer_address' => 'required|string|max:1000',
-            'delivery_zone' => 'nullable|string|in:inside_dhaka,outside_dhaka',
-            'payment_method' => 'nullable|string|in:cash_on_delivery,confirmation_charge',
+            'delivery_zone' => ['nullable', 'string', \Illuminate\Validation\Rule::in($this->delivery->zoneCodes($shopId))],
+            'payment_method' => ['nullable', 'string', \Illuminate\Validation\Rule::in($this->delivery->allowedPaymentMethods())],
         ], [
             'customer_address.required' => 'Delivery address is required to place your order.',
         ]);
@@ -784,6 +793,7 @@ class WebsiteController extends Controller
                 'zone' => $request->input('delivery_zone'),
                 'payment_method' => $request->input('payment_method'),
                 'attribution' => $this->attribution->orderAttributes($request, $shopId),
+                'context' => ['cart_token' => $this->carts->token($request)],
             ]);
         } catch (OrderCreationException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()]);
@@ -805,5 +815,15 @@ class WebsiteController extends Controller
             'amount_due_later' => $quote['amount_due_later'],
             'message' => $result['message'],
         ]);
+    }
+
+    /** Cart follow-up tracking must never break the storefront cart. */
+    private function recordCart(Request $request, int $shopId, array $lines, float $subtotal): void
+    {
+        try {
+            $this->carts->record($request, $shopId, $lines, $subtotal, (array) $request->input('contact', []));
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 }

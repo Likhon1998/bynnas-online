@@ -4,28 +4,27 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\OrderStatusLog;
+use App\Support\OrderStatus;
 
 class OnlineOrderTrackingService
 {
-    public const FLOW_STATUSES = ['pending', 'processing', 'shipped', 'completed'];
+    /** Customer-facing tracker steps. */
+    public const FLOW_STATUSES = OrderStatus::CUSTOMER_STEPS;
 
+    /** Customer-facing labels, keyed by stored status (legacy aliases included). */
     public function statusLabels(): array
     {
-        return [
-            'pending' => 'Received',
-            'pending_fulfillment' => 'Received',
-            'processing' => 'Preparing',
-            'shipped' => 'In transit',
-            'completed' => 'Delivered',
-            'cancelled' => 'Cancelled',
-            'returned' => 'Returned',
-            'refunded' => 'Refunded',
-        ];
+        $labels = OrderStatus::customerLabels();
+        foreach (OrderStatus::LEGACY_NEW as $legacy) {
+            $labels[$legacy] = $labels[OrderStatus::NEW];
+        }
+
+        return $labels;
     }
 
     public function normalizeFlowStatus(string $status): string
     {
-        return $status === 'pending_fulfillment' ? 'pending' : $status;
+        return OrderStatus::customerStep($status);
     }
 
     public function log(
@@ -36,12 +35,10 @@ class OnlineOrderTrackingService
         ?string $tracking = null,
         ?int $userId = null,
     ): OrderStatusLog {
-        $label = $this->statusLabels()[$status] ?? ucfirst($status);
-
         return OrderStatusLog::create([
             'order_id' => $order->id,
             'status' => $status,
-            'label' => $label,
+            'label' => OrderStatus::customerLabel($status),
             'note' => $note,
             'courier_name' => $courier,
             'tracking_number' => $tracking,
@@ -61,7 +58,7 @@ class OnlineOrderTrackingService
 
         if ($latest && $latest->status === $status) {
             $latest->update([
-                'label' => $this->statusLabels()[$status] ?? ucfirst($status),
+                'label' => OrderStatus::customerLabel($status),
                 'note' => $note ?? $latest->note,
                 'courier_name' => $courier ?? $latest->courier_name,
                 'tracking_number' => $tracking ?? $latest->tracking_number,
@@ -78,7 +75,7 @@ class OnlineOrderTrackingService
     {
         return $this->log(
             $order,
-            $order->status ?: 'pending_fulfillment',
+            $order->status ?: OrderStatus::NEW,
             'Your order has been received and is awaiting confirmation.',
         );
     }
@@ -90,16 +87,15 @@ class OnlineOrderTrackingService
             ? $order->statusLogs->sortBy('created_at')->values()
             : $order->statusLogs()->orderBy('created_at')->get();
 
-        $current = $order->status;
-        $isTerminal = in_array($current, ['cancelled', 'returned', 'refunded'], true);
+        $current = OrderStatus::normalize($order->status);
 
-        if ($isTerminal) {
+        if (OrderStatus::isVoid($current)) {
             $latest = $logs->last();
 
             return [
                 [
                     'key' => $current,
-                    'label' => $this->statusLabels()[$current] ?? ucfirst($current),
+                    'label' => OrderStatus::customerLabel($current),
                     'done' => true,
                     'active' => true,
                     'at' => optional($latest)->created_at?->format('d M Y, h:i A'),
@@ -111,27 +107,26 @@ class OnlineOrderTrackingService
         $statusRank = array_flip(self::FLOW_STATUSES);
         $flowCurrent = $this->normalizeFlowStatus($current);
         $currentRank = $statusRank[$flowCurrent] ?? 0;
+        $finalStep = self::FLOW_STATUSES[count(self::FLOW_STATUSES) - 1];
         $timeline = [];
 
         foreach (self::FLOW_STATUSES as $index => $step) {
-            $stepLog = $this->latestLogForStatus($logs, $step);
-            if ($step === 'pending' && ! $stepLog) {
-                $stepLog = $this->latestLogForStatus($logs, 'pending_fulfillment');
-            }
+            $stepLog = $this->latestLogForStep($logs, $step);
             $isActive = $step === $flowCurrent;
             $isDone = $index < $currentRank;
+            $isFirst = $index === 0;
             $timeline[] = [
                 'key' => $step,
-                'label' => $this->statusLabels()[$step],
-                'done' => $isDone || ($isActive && $flowCurrent === 'completed'),
+                'label' => OrderStatus::customerLabel($step),
+                'done' => $isDone || ($isActive && $flowCurrent === $finalStep),
                 'active' => $isActive,
                 'at' => $stepLog?->created_at?->format('d M, h:i A')
-                    ?? (($step === 'pending' && ($isDone || $isActive)) ? $order->created_at->format('d M, h:i A') : null),
+                    ?? (($isFirst && ($isDone || $isActive)) ? $order->created_at->format('d M, h:i A') : null),
                 'note' => $stepLog?->note
-                    ?? (($step === 'pending' && ($isDone || $isActive)) ? 'Your order has been received and is awaiting confirmation.' : null)
+                    ?? (($isFirst && ($isDone || $isActive)) ? $this->defaultStatusNote(OrderStatus::NEW) : null)
                     ?? ($isActive ? $this->defaultStatusNote($step) : null),
-                'courier' => $step === 'shipped' ? ($stepLog?->courier_name ?: $order->shipping_courier) : null,
-                'tracking' => $step === 'shipped' ? ($stepLog?->tracking_number ?: $order->shipping_tracking_no) : null,
+                'courier' => $step === OrderStatus::SHIPPED ? ($stepLog?->courier_name ?: $order->shipping_courier) : null,
+                'tracking' => $step === OrderStatus::SHIPPED ? ($stepLog?->tracking_number ?: $order->shipping_tracking_no) : null,
             ];
         }
 
@@ -141,10 +136,11 @@ class OnlineOrderTrackingService
     protected function defaultStatusNote(string $status): string
     {
         return match ($status) {
-            'pending' => 'Your order has been received and is awaiting confirmation.',
-            'processing' => 'Your items are being prepared for dispatch.',
-            'shipped' => 'Your package is on the way to the delivery address.',
-            'completed' => 'Delivery completed successfully.',
+            OrderStatus::NEW => 'Your order has been received and is awaiting confirmation.',
+            OrderStatus::CONFIRMED => 'Your order has been confirmed.',
+            OrderStatus::PROCESSING => 'Your items are being prepared for dispatch.',
+            OrderStatus::SHIPPED => 'Your package is on the way to the delivery address.',
+            OrderStatus::DELIVERED => 'Delivery completed successfully.',
             default => '',
         };
     }
@@ -162,12 +158,12 @@ class OnlineOrderTrackingService
             'invoice' => $order->invoice_no,
             'status' => $this->normalizeFlowStatus($order->status),
             'status_raw' => $order->status,
-            'status_label' => $this->statusLabels()[$order->status] ?? ucfirst($order->status),
+            'status_label' => OrderStatus::customerLabel($order->status),
             'message' => 'Order found!',
             'date' => asian_datetime($order->created_at, 'd M Y, h:i A'),
             'total' => number_format((float) $order->total_amount, 2),
-            'delivery_address' => $order->customer?->address,
-            'customer_name' => $order->customer?->name,
+            'delivery_address' => $order->delivery_address ?: $order->customer?->address,
+            'customer_name' => $order->delivery_name ?: $order->customer?->name,
             'courier' => $order->shipping_courier,
             'tracking_number' => $order->shipping_tracking_no,
             'items' => $order->items->map(function ($item) {
@@ -185,7 +181,7 @@ class OnlineOrderTrackingService
             'timeline' => $timeline,
             'updates' => $order->statusLogs->sortByDesc('created_at')->values()->map(fn ($log) => [
                 'status' => $log->status,
-                'label' => $log->label,
+                'label' => OrderStatus::customerLabel($log->status),
                 'note' => $log->note,
                 'courier' => $log->courier_name,
                 'tracking' => $log->tracking_number,
@@ -197,25 +193,29 @@ class OnlineOrderTrackingService
 
     protected function whereIsProductMessage(Order $order, ?array $activeStep): string
     {
-        $status = $this->normalizeFlowStatus($order->status);
-
-        return match ($status) {
-            'pending' => 'We have received your order and will confirm it shortly.',
-            'processing' => 'Your order is being prepared for dispatch.',
-            'shipped' => $order->shipping_courier
+        return match (OrderStatus::normalize($order->status)) {
+            OrderStatus::NEW => 'We have received your order and will confirm it shortly.',
+            OrderStatus::CONFIRMED => 'Your order is confirmed and will be prepared soon.',
+            OrderStatus::PROCESSING => 'Your order is being prepared for dispatch.',
+            OrderStatus::PACKED => 'Your order is packed and waiting for the courier.',
+            OrderStatus::SHIPPED => $order->shipping_courier
                 ? 'In transit with '.$order->shipping_courier.($order->shipping_tracking_no ? ' · '.$order->shipping_tracking_no : '').'.'
                 : 'Your package is in transit to the delivery address.',
-            'completed' => 'Delivered successfully. Thank you for your purchase.',
-            'cancelled' => 'This order has been cancelled.',
-            'returned' => 'This order has been returned.',
-            'refunded' => 'This order has been refunded.',
+            OrderStatus::DELIVERED, OrderStatus::COMPLETED => 'Delivered successfully. Thank you for your purchase.',
+            OrderStatus::RETURN_REQUESTED => 'Your return request is being reviewed.',
+            OrderStatus::CANCELLED => 'This order has been cancelled.',
+            OrderStatus::RETURNED => 'This order has been returned.',
+            OrderStatus::REFUNDED => 'This order has been refunded.',
             default => $activeStep['note']
                 ?? 'We have received your order and will share updates as it progresses.',
         };
     }
 
-    protected function latestLogForStatus($logs, string $status): ?OrderStatusLog
+    protected function latestLogForStep($logs, string $step): ?OrderStatusLog
     {
-        return $logs->where('status', $status)->sortByDesc('created_at')->first();
+        return $logs
+            ->filter(fn ($log) => OrderStatus::customerStep($log->status) === $step)
+            ->sortByDesc('created_at')
+            ->first();
     }
 }

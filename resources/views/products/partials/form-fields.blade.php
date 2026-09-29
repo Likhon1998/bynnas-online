@@ -689,6 +689,22 @@
                 </label>
             </div>
 
+            <div x-data="{ combo: {{ old('is_combo', $prefill?->is_combo ?? false) ? 'true' : 'false' }} }"
+                 class="rounded-xl border border-dashed border-slate-200 p-3.5">
+                <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                    <input type="checkbox" name="is_combo" value="1" x-model="combo" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                    Combo pack
+                    <span class="text-xs font-normal text-slate-400">Bundle of items sold together at one price</span>
+                </label>
+                <div x-show="combo" x-cloak class="mt-3">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">What’s in the combo <span class="font-normal text-slate-400">(one item per line)</span></label>
+                    <textarea name="combo_items" rows="4"
+                              class="block w-full rounded-lg border-slate-200 text-sm"
+                              placeholder="Baby feeding bottle 250ml&#10;Soft silicone spoon set&#10;Cotton bib (2 pcs)">{{ old('combo_items', $prefill?->combo_items ?? '') }}</textarea>
+                    @error('combo_items') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+            </div>
+
             @if(!$isEdit)
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" x-show="isSimple">
                     <div>

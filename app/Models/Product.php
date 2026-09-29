@@ -25,6 +25,7 @@ class Product extends Model
         'short_description', 'description', 'brand_name', 'rating', 'review_count',
         'seo_title', 'meta_description', 'og_title', 'og_description', 'og_image',
         'is_best_seller', 'is_featured', 'is_new_arrival', 'is_published',
+        'is_combo', 'combo_items',
     ];
 
     protected static function booted(): void
@@ -77,6 +78,7 @@ class Product extends Model
         'is_best_seller' => 'boolean',
         'is_featured' => 'boolean',
         'is_new_arrival' => 'boolean',
+        'is_combo' => 'boolean',
         'is_published' => 'boolean',
         'requires_imei' => 'boolean',
         'filter_attributes' => 'array',
@@ -285,6 +287,22 @@ class Product extends Model
     public function scopeTrending($query)
     {
         return $query->where('is_best_seller', true);
+    }
+
+    /** Combo packs: sold as one product with their own stock, price and checkout path. */
+    public function scopeCombos($query)
+    {
+        return $query->where('is_combo', true);
+    }
+
+    /** Items listed in a combo pack, one per line in the admin form. */
+    public function comboItemList(): array
+    {
+        return collect(preg_split('/\r\n|\r|\n/', (string) $this->combo_items))
+            ->map(fn ($line) => trim(ltrim(trim($line), '-•*')))
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /** Whether the storefront should show a "New" badge. */

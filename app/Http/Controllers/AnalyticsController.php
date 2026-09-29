@@ -39,7 +39,7 @@ class AnalyticsController extends Controller
             'total' => $this->analytics->orderCount($shopId, $start, $end),
             'pos' => $this->analytics->posOrders($shopId, $start, $end)->count(),
             'web' => $this->analytics->webOrders($shopId, $start, $end)->count(),
-            'pending' => $this->analytics->baseOrderQuery($shopId, $start, $end)->whereIn('status', ['pending', 'pending_fulfillment'])->count(),
+            'pending' => $this->analytics->baseOrderQuery($shopId, $start, $end)->whereIn('status', \App\Support\OrderStatus::expand(\App\Support\OrderStatus::open()))->count(),
             'completed' => $this->analytics->baseOrderQuery($shopId, $start, $end)->where('status', 'completed')->count(),
         ];
 

@@ -376,7 +376,7 @@
             @endunless
             <tr>
                 <td class="lbl">Status</td>
-                <td class="val">{{ strtoupper($order->status) }}</td>
+                <td class="val">{{ strtoupper(\App\Support\OrderStatus::label($order->status)) }}</td>
             </tr>
         </table>
 
@@ -529,7 +529,7 @@
                         <td class="lbl">
                             Delivery
                             @if(filled($order->delivery_zone))
-                                ({{ $order->delivery_zone === 'outside_dhaka' ? 'Outside Dhaka' : 'Inside Dhaka' }})
+                                ({{ app(\App\Services\DeliveryChargeService::class)->zoneLabel($order->delivery_zone, $order->shop_id) }})
                             @endif
                         </td>
                         <td class="text-right">

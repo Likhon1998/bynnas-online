@@ -3,12 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Services\AccountService;
-use App\Services\OnlineOrderTrackingService;
-use App\Services\StockService;
+use App\Services\OrderWorkflowException;
+use App\Services\OrderWorkflowService;
+use App\Support\OrderStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Edge-case COD lifecycle: cancel / fraud / door reject → release reserved stock
@@ -17,9 +16,7 @@ use Illuminate\Support\Facades\DB;
 class OrderCancellationController extends Controller
 {
     public function __construct(
-        protected StockService $stock,
-        protected AccountService $accounts,
-        protected OnlineOrderTrackingService $tracking,
+        protected OrderWorkflowService $workflow,
     ) {}
 
     /**
@@ -36,12 +33,12 @@ class OrderCancellationController extends Controller
             abort(403, 'Unauthorized Access');
         }
 
-        if (in_array($order->status, ['cancelled', 'returned', 'refunded'], true)) {
+        if (OrderStatus::isVoid($order->status)) {
             return back()->with('error', 'This order is already closed.');
         }
 
-        if ($order->status === 'completed') {
-            return back()->with('error', 'Delivered orders cannot be cancelled. Use refund instead.');
+        if (! OrderStatus::canTransition($order->status, OrderStatus::CANCELLED)) {
+            return back()->with('error', 'Delivered orders cannot be cancelled. Use return or refund instead.');
         }
 
         $request->validate([
@@ -49,38 +46,15 @@ class OrderCancellationController extends Controller
             'reason' => 'nullable|string|max:80',
         ]);
 
-        $reason = $request->input('reason', 'order_cancelled');
-        $note = $request->input('customer_note') ?: 'This order was cancelled.';
-
         try {
-            DB::transaction(function () use ($order, $reason, $note, $user) {
-                $oldStatus = $order->status;
-
-                $order->update([
-                    'status' => 'cancelled',
-                    'paid_amount' => 0,
-                ]);
-
-                $this->tracking->upsertLatestLog(
-                    $order,
-                    'cancelled',
-                    $note,
-                    $order->shipping_courier,
-                    $order->shipping_tracking_no,
-                    $user->id,
-                );
-
-                $order->load('items.product', 'counter');
-                $this->stock->releaseReservedStock($order, $user->id, $reason);
-
-                if (! in_array($oldStatus, ['cancelled', 'returned', 'refunded'], true)) {
-                    $this->accounts->postOrderRefund($order);
-                }
-            });
-
-            return back()->with('success', "Order {$order->invoice_no} cancelled. Reserved stock returned to available inventory.");
-        } catch (\Throwable $e) {
+            $this->workflow->transition($order, OrderStatus::CANCELLED, [
+                'note' => $request->input('customer_note') ?: 'This order was cancelled.',
+                'stock_reason' => $request->input('reason', 'order_cancelled'),
+            ], $user->id);
+        } catch (OrderWorkflowException|\InvalidArgumentException $e) {
             return back()->with('error', 'Cancel failed: '.$e->getMessage());
         }
+
+        return back()->with('success', "Order {$order->invoice_no} cancelled. Reserved stock returned to available inventory.");
     }
 }

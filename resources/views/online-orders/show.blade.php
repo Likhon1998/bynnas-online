@@ -1,17 +1,7 @@
 <x-app-layout>
 @php
-    $statusColors = [
-        'pending' => 'bg-amber-100 text-amber-800 border-amber-200',
-        'pending_fulfillment' => 'bg-amber-100 text-amber-800 border-amber-200',
-        'processing' => 'bg-blue-100 text-blue-800 border-blue-200',
-        'shipped' => 'bg-indigo-100 text-indigo-800 border-indigo-200',
-        'completed' => 'bg-emerald-100 text-emerald-800 border-emerald-200',
-        'cancelled' => 'bg-orange-100 text-orange-800 border-orange-200',
-        'returned' => 'bg-rose-100 text-rose-800 border-rose-200',
-        'refunded' => 'bg-rose-100 text-rose-800 border-rose-200',
-    ];
-    $statusClass = $statusColors[$order->status] ?? 'bg-slate-100 text-slate-700 border-slate-200';
-    $statusLabel = $statusLabels[$order->status] ?? ucfirst($order->status);
+    $statusClass = \App\Support\OrderStatus::badgeClasses()[$currentStatus] ?? 'bg-slate-100 text-slate-700 border-slate-200';
+    $statusLabel = $statusLabels[$currentStatus] ?? ucfirst($currentStatus);
 @endphp
 
 <div class="space-y-4">
@@ -46,7 +36,7 @@
             <p class="text-[11px] text-slate-500">Customer sees the same progress in My Account</p>
         </div>
 
-        @if(in_array($order->status, ['cancelled', 'returned', 'refunded'], true))
+        @if(\App\Support\OrderStatus::isVoid($order->status))
             <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] font-semibold text-rose-700">
                 {{ $statusLabel }}
                 @if($order->statusLogs->first()?->note)
@@ -54,7 +44,7 @@
                 @endif
             </div>
         @else
-            <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <div class="grid grid-cols-2 gap-2 md:grid-cols-5">
                 @foreach($timeline as $step)
                     <div class="rounded-xl border px-3 py-3
                         @if($step['active']) border-indigo-300 bg-indigo-50
@@ -258,7 +248,58 @@
         </div>
 
         <div class="space-y-4 xl:sticky xl:top-24 xl:self-start">
-            @if(($dueFromCourier ?? 0) > 0.009 && $order->status === 'shipped')
+            @if($currentStatus === \App\Support\OrderStatus::NEW)
+                <div class="rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
+                    <h3 class="text-[13px] font-bold text-amber-950">Verify this order</h3>
+                    <p class="mt-1 text-[12px] text-amber-800 leading-relaxed">
+                        Contact the customer to confirm the items, address and payment before processing.
+                    </p>
+                    <form method="POST" action="{{ route('online-orders.verify', $order) }}" class="mt-3 space-y-2.5">
+                        @csrf
+                        <div>
+                            <label class="text-[10px] font-bold uppercase tracking-wide text-amber-700">Verified by</label>
+                            <select name="verification_method" required class="mt-1 w-full rounded-xl border-amber-200 text-[13px] focus:border-amber-400 focus:ring-amber-400">
+                                <option value="">How did you verify?</option>
+                                @foreach($verificationMethods as $key => $label)
+                                    <option value="{{ $key }}" @selected(old('verification_method') === $key)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold uppercase tracking-wide text-amber-700">Internal notes</label>
+                            <textarea name="verification_notes" rows="2" maxlength="500" placeholder="e.g. Spoke to customer, address confirmed"
+                                      class="mt-1 w-full rounded-xl border-amber-200 text-[13px] focus:border-amber-400 focus:ring-amber-400">{{ old('verification_notes') }}</textarea>
+                        </div>
+                        <button type="submit" class="w-full rounded-xl bg-amber-600 px-4 py-2.5 text-[13px] font-bold text-white hover:bg-amber-700">
+                            Mark verified · confirm order
+                        </button>
+                    </form>
+                </div>
+            @elseif($order->verified_at)
+                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                    <p class="text-[11px] font-bold uppercase tracking-wide text-emerald-600">Verified</p>
+                    <p class="mt-1 text-[13px] font-semibold text-emerald-950">
+                        {{ $verificationMethods[$order->verification_method] ?? ucfirst((string) $order->verification_method) }}
+                        · {{ $order->verifier?->name ?? 'Staff' }}
+                    </p>
+                    <p class="text-[11px] text-emerald-700">{{ $order->verified_at->format('d M Y, h:i A') }}</p>
+                    @if($order->verification_notes)
+                        <p class="mt-1.5 text-[12px] text-emerald-900">{{ $order->verification_notes }}</p>
+                    @endif
+                </div>
+            @endif
+
+            @if($order->return_requested_at)
+                <div class="rounded-2xl border border-yellow-300 bg-yellow-50 p-4">
+                    <p class="text-[11px] font-bold uppercase tracking-wide text-yellow-700">Return requested</p>
+                    <p class="text-[11px] text-yellow-800">{{ $order->return_requested_at->format('d M Y, h:i A') }}</p>
+                    @if($order->return_reason)
+                        <p class="mt-1.5 text-[12px] text-yellow-900">{{ $order->return_reason }}</p>
+                    @endif
+                </div>
+            @endif
+
+            @if(($dueFromCourier ?? 0) > 0.009 && in_array($currentStatus, ['shipped', 'delivered'], true))
                 <div class="rounded-2xl border border-sky-300 bg-sky-50 p-4 shadow-sm">
                     <h3 class="text-[13px] font-bold text-sky-950">Collect cash from courier</h3>
                     <p class="mt-1 text-[12px] text-sky-800 leading-relaxed">
@@ -282,26 +323,30 @@
                 <h3 class="text-[13px] font-bold text-slate-900">Update order status</h3>
                 <p class="mt-0.5 text-[11px] text-slate-500">Saves instantly to the customer account</p>
 
-                <form method="POST" action="{{ route('online-orders.update-status', $order) }}" class="mt-3 space-y-3" x-data="{ status: @js($order->status) }">
+                <form method="POST" action="{{ route('online-orders.update-status', $order) }}" class="mt-3 space-y-3" x-data="{ status: @js($currentStatus) }">
                     @csrf
                     <div>
                         <label class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Status</label>
                         <select name="status" x-model="status" class="mt-1 w-full rounded-xl border-slate-200 text-[13px] font-semibold focus:border-indigo-400 focus:ring-indigo-400">
                             @php
                                 $statusOptionLabels = [
-                                    'pending' => 'Pending — Order received',
-                                    'pending_fulfillment' => 'Pending fulfillment — Stock reserved',
-                                    'processing' => 'Processing — Packing',
-                                    'shipped' => 'Shipped — Out for delivery',
-                                    'completed' => 'Completed — Delivered & cash from courier',
+                                    'new' => 'New — Awaiting verification',
+                                    'confirmed' => 'Confirmed — Verified with customer',
+                                    'processing' => 'Processing — Picking items',
+                                    'packed' => 'Packed — Stock deducted, ready for courier',
+                                    'shipped' => 'Shipped — Handed to courier',
+                                    'delivered' => 'Delivered — Courier holds COD',
+                                    'completed' => 'Completed — Cash received from courier',
+                                    'return_requested' => 'Return requested',
                                     'cancelled' => 'Cancelled',
                                     'returned' => 'Returned',
                                     'refunded' => 'Refunded',
                                 ];
-                                $forward = array_values(array_filter($allowedNextStatuses ?? [], fn ($s) => $s !== $order->status && ! in_array($s, ['cancelled', 'returned', 'refunded'], true)));
-                                $voids = array_values(array_filter($allowedNextStatuses ?? [], fn ($s) => in_array($s, ['cancelled', 'returned', 'refunded'], true)));
+                                $isVoidOption = fn ($s) => \App\Support\OrderStatus::isVoid($s);
+                                $forward = array_values(array_filter($allowedNextStatuses ?? [], fn ($s) => $s !== $currentStatus && ! $isVoidOption($s)));
+                                $voids = array_values(array_filter($allowedNextStatuses ?? [], $isVoidOption));
                             @endphp
-                            <option value="{{ $order->status }}">{{ $statusOptionLabels[$order->status] ?? ucfirst($order->status) }} (current)</option>
+                            <option value="{{ $currentStatus }}">{{ $statusOptionLabels[$currentStatus] ?? ucfirst($currentStatus) }} (current)</option>
                             @foreach($forward as $s)
                                 <option value="{{ $s }}">{{ $statusOptionLabels[$s] ?? ucfirst($s) }}</option>
                             @endforeach
@@ -314,7 +359,25 @@
                         </select>
                     </div>
 
-                    <div x-show="status === 'shipped'" x-cloak class="space-y-3 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
+                    <div x-show="status === 'confirmed' && @js(! $order->verified_at)" x-cloak class="space-y-2 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+                        <label class="text-[10px] font-bold uppercase tracking-wide text-amber-700">Verified by *</label>
+                        <select name="verification_method" class="w-full rounded-xl border-amber-200 text-[13px]">
+                            <option value="">How did you verify?</option>
+                            @foreach($verificationMethods as $key => $label)
+                                <option value="{{ $key }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        <textarea name="verification_notes" rows="2" maxlength="500" placeholder="Internal verification notes"
+                                  class="w-full rounded-xl border-amber-200 text-[13px]"></textarea>
+                    </div>
+
+                    <div x-show="status === 'return_requested'" x-cloak class="rounded-xl border border-yellow-200 bg-yellow-50/60 p-3">
+                        <label class="text-[10px] font-bold uppercase tracking-wide text-yellow-700">Return reason</label>
+                        <textarea name="return_reason" rows="2" maxlength="500" placeholder="Why does the customer want to return it?"
+                                  class="mt-1 w-full rounded-xl border-yellow-200 text-[13px]"></textarea>
+                    </div>
+
+                    <div x-show="['shipped', 'delivered'].includes(status)" x-cloak class="space-y-3 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
                         <div>
                             <label class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Courier service *</label>
                             @if(($courierServices ?? collect())->isEmpty())

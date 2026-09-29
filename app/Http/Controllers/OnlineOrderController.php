@@ -4,26 +4,33 @@ namespace App\Http\Controllers;
 
 use App\Models\CourierService;
 use App\Models\Order;
-use App\Services\AccountService;
 use App\Services\OnlineOrderTrackingService;
-use App\Services\StockService;
+use App\Services\OrderWorkflowException;
+use App\Services\OrderWorkflowService;
+use App\Support\OrderStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class OnlineOrderController extends Controller
 {
     public function __construct(
-        protected AccountService $accounts,
-        protected StockService $stock,
         protected OnlineOrderTrackingService $tracking,
+        protected OrderWorkflowService $workflow,
     ) {}
 
     protected function ensureAdmin(): void
     {
         if (! Auth::user()?->isAdminUser()) {
             abort(403, 'Online orders are only available to shop admins.');
+        }
+    }
+
+    protected function authorizeOrder(Order $order): void
+    {
+        $this->ensureAdmin();
+        if ($order->shop_id !== Auth::user()->shop_id || ! $order->isOnlineOrder()) {
+            abort(403, 'Unauthorized Access');
         }
     }
 
@@ -43,21 +50,27 @@ class OnlineOrderController extends Controller
             $statsQuery->whereDate('created_at', $filterDate);
         }
 
-        $stats = $statsQuery->selectRaw("
-            COALESCE(SUM(CASE WHEN status IN ('pending', 'pending_fulfillment') THEN 1 ELSE 0 END), 0) as pending_count,
-            COALESCE(SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END), 0) as processing_count,
-            COALESCE(SUM(CASE WHEN status = 'shipped' THEN 1 ELSE 0 END), 0) as shipped_count,
-            COALESCE(SUM(CASE WHEN status = 'completed' THEN GREATEST(0, total_amount - COALESCE(delivery_charge, 0) - COALESCE(discount_amount, 0) - COALESCE(exchange_credit, 0)) ELSE 0 END), 0) as settled_revenue
-        ")->first();
+        $statusCounts = (clone $statsQuery)
+            ->selectRaw('status, COUNT(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+        $countFor = fn (array $statuses) => (int) collect(OrderStatus::expand($statuses))
+            ->sum(fn ($status) => (int) ($statusCounts[$status] ?? 0));
 
-        $pendingCount = (int) ($stats->pending_count ?? 0);
-        $processingCount = (int) ($stats->processing_count ?? 0);
-        $shippedCount = (int) ($stats->shipped_count ?? 0);
-        $settledRevenue = (float) ($stats->settled_revenue ?? 0);
+        $pendingCount = $countFor([OrderStatus::NEW]);
+        $confirmedCount = $countFor([OrderStatus::CONFIRMED]);
+        $processingCount = $countFor([OrderStatus::PROCESSING, OrderStatus::PACKED]);
+        $shippedCount = $countFor([OrderStatus::SHIPPED]);
+        $returnRequestedCount = $countFor([OrderStatus::RETURN_REQUESTED]);
+
+        $settledRevenue = (float) (clone $statsQuery)
+            ->where('status', OrderStatus::COMPLETED)
+            ->selectRaw('COALESCE(SUM(CASE WHEN total_amount - COALESCE(delivery_charge, 0) - COALESCE(discount_amount, 0) - COALESCE(exchange_credit, 0) > 0 THEN total_amount - COALESCE(delivery_charge, 0) - COALESCE(discount_amount, 0) - COALESCE(exchange_credit, 0) ELSE 0 END), 0) as settled')
+            ->value('settled');
 
         $dueQuery = Order::where('shop_id', $shopId)
             ->onlineOrders()
-            ->where('status', 'shipped')
+            ->whereIn('status', [OrderStatus::SHIPPED, OrderStatus::DELIVERED])
             ->whereNull('courier_collected_at');
 
         if ($filterDate) {
@@ -121,9 +134,14 @@ class OnlineOrderController extends Controller
             ->map(fn (Order $order) => $this->orderListPayload($order))
             ->values();
 
+        $statusLabels = OrderStatus::labels();
+        $statusBadges = OrderStatus::badgeClasses();
+
         return view('online-orders.index', compact(
             'ordersPayload',
             'pendingCount',
+            'confirmedCount',
+            'returnRequestedCount',
             'processingCount',
             'shippedCount',
             'courierReceivables',
@@ -132,19 +150,21 @@ class OnlineOrderController extends Controller
             'filterDate',
             'search',
             'statusFilter',
+            'statusLabels',
+            'statusBadges',
         ));
     }
 
     private function orderListPayload(Order $order): array
     {
         $productRevenue = (float) $order->total_amount - (float) ($order->delivery_charge ?? 0);
-        $isVoided = in_array($order->status, ['refunded', 'cancelled', 'returned'], true);
         $dueFromCourier = $order->amountDueFromCourier();
 
         return [
             'id' => $order->id,
             'invoice' => $order->invoice_no,
-            'status' => $order->status,
+            'status' => $order->workflowStatus(),
+            'is_verified' => $order->isVerified(),
             'created_at' => asian_datetime($order->created_at, 'd M Y, h:i A'),
             'payment_method' => str_replace('_', ' ', (string) $order->payment_method),
             'product_revenue' => format_taka_number($productRevenue),
@@ -154,12 +174,12 @@ class OnlineOrderController extends Controller
             'shipping_tracking_no' => $order->shipping_tracking_no,
             'due_from_courier' => $dueFromCourier,
             'due_from_courier_fmt' => format_taka_number($dueFromCourier),
-            'is_voided' => $isVoided,
+            'is_voided' => OrderStatus::isVoid($order->status),
             'show_url' => route('online-orders.show', $order),
             'receipt_url' => route('orders.invoice', $order->id),
-            'customer_name' => $order->customer->name ?? 'Guest',
-            'customer_phone' => $order->customer->phone ?? 'N/A',
-            'customer_address' => $order->customer->address ?? 'No address provided',
+            'customer_name' => $order->delivery_name ?: ($order->customer->name ?? 'Guest'),
+            'customer_phone' => $order->delivery_phone ?: ($order->customer->phone ?? 'N/A'),
+            'customer_address' => $order->delivery_address ?: ($order->customer->address ?? 'No address provided'),
             'items' => $order->items->map(fn ($item) => [
                 'qty' => (int) $item->quantity,
                 'name' => $item->product->name ?? 'Unknown Product',
@@ -171,14 +191,14 @@ class OnlineOrderController extends Controller
                 $order->shipping_courier,
                 $order->customer?->name,
                 $order->customer?->phone,
+                $order->delivery_phone,
             ]))),
         ];
     }
 
     public function show(Order $order)
     {
-        $this->ensureAdmin();
-        abort_unless($order->shop_id === Auth::user()->shop_id && $order->isOnlineOrder(), 403);
+        $this->authorizeOrder($order);
 
         // Opening an order from the bell should clear the unread badge.
         session(['online_orders_seen_at' => now()->toDateTimeString()]);
@@ -188,15 +208,18 @@ class OnlineOrderController extends Controller
             'items:id,order_id,product_id,quantity,unit_price,subtotal',
             'items.product:id,name',
             'courierService:id,name,phone',
+            'verifier:id,name',
             'statusLogs' => fn ($q) => $q->latest('id')->limit(20),
         ]);
 
         $timeline = $this->tracking->customerTimeline($order);
-        $statusLabels = $this->tracking->statusLabels();
+        $statusLabels = OrderStatus::labels();
+        $currentStatus = $order->workflowStatus();
         $allowedNextStatuses = array_values(array_unique(array_merge(
-            [$order->status],
-            self::STATUS_TRANSITIONS[$order->status] ?? [],
+            [$currentStatus],
+            OrderStatus::nextFor($currentStatus),
         )));
+        $verificationMethods = OrderStatus::VERIFICATION_METHODS;
 
         $courierServices = CourierService::forShop(Auth::user()->shop_id)
             ->active()
@@ -210,6 +233,8 @@ class OnlineOrderController extends Controller
             'order',
             'timeline',
             'statusLabels',
+            'currentStatus',
+            'verificationMethods',
             'allowedNextStatuses',
             'courierServices',
             'dueFromCourier',
@@ -238,9 +263,7 @@ class OnlineOrderController extends Controller
             ->limit(10)
             ->get(['id', 'invoice_no', 'status', 'total_amount', 'customer_id', 'created_at']);
 
-        $labels = $this->tracking->statusLabels();
-
-        $items = $orders->map(function (Order $order) use ($seenAt, $labels) {
+        $items = $orders->map(function (Order $order) use ($seenAt) {
             $isNew = $seenAt
                 ? $order->created_at->greaterThan($seenAt)
                 : $order->created_at->greaterThan(now()->subDay());
@@ -248,8 +271,8 @@ class OnlineOrderController extends Controller
             return [
                 'id' => $order->id,
                 'invoice' => $order->invoice_no,
-                'status' => $order->status,
-                'status_label' => $labels[$order->status] ?? ucfirst($order->status),
+                'status' => $order->workflowStatus(),
+                'status_label' => OrderStatus::label($order->status),
                 'customer' => $order->customer?->name ?? 'Guest',
                 'phone' => $order->customer?->phone,
                 'total' => format_taka_number((float) $order->total_amount),
@@ -273,31 +296,13 @@ class OnlineOrderController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    /** Allowed forward status changes for online orders (terminal states cannot reopen). */
-    private const STATUS_TRANSITIONS = [
-        'pending' => ['processing', 'cancelled'],
-        'pending_fulfillment' => ['processing', 'cancelled'],
-        'processing' => ['shipped', 'cancelled'],
-        'shipped' => ['completed', 'returned', 'cancelled'],
-        'completed' => ['refunded'],
-        'cancelled' => [],
-        'returned' => [],
-        'refunded' => [],
-    ];
-
-    private const AWAITING_FULFILLMENT = ['pending', 'pending_fulfillment'];
-
     public function updateStatus(Request $request, Order $order)
     {
-        $this->ensureAdmin();
-        if ($order->shop_id !== Auth::user()->shop_id || ! $order->isOnlineOrder()) {
-            abort(403, 'Unauthorized Access');
-        }
-
+        $this->authorizeOrder($order);
         $shopId = Auth::user()->shop_id;
 
-        $request->validate([
-            'status' => 'required|in:pending,pending_fulfillment,processing,shipped,completed,cancelled,returned,refunded',
+        $data = $request->validate([
+            'status' => ['required', Rule::in(OrderStatus::storedValues())],
             'customer_note' => 'nullable|string|max:500',
             'courier_service_id' => [
                 'nullable',
@@ -305,147 +310,67 @@ class OnlineOrderController extends Controller
                 Rule::exists('courier_services', 'id')->where(fn ($q) => $q->where('shop_id', $shopId)->where('is_active', true)),
             ],
             'tracking_number' => 'nullable|string|max:120',
+            'verification_method' => ['nullable', Rule::in(array_keys(OrderStatus::VERIFICATION_METHODS))],
+            'verification_notes' => 'nullable|string|max:500',
+            'return_reason' => 'nullable|string|max:500',
         ]);
 
-        $oldStatus = $order->status;
-        $newStatus = $request->status;
+        $from = $order->workflowStatus();
+        $to = OrderStatus::normalize($data['status']);
 
-        if (
-            $oldStatus === $newStatus
-            && ! $request->filled('customer_note')
-            && ! $request->filled('tracking_number')
-            && ! $request->filled('courier_service_id')
-        ) {
-            return back();
+        try {
+            $order = $this->workflow->transition($order, $to, [
+                'note' => $data['customer_note'] ?? null,
+                'courier_service_id' => $data['courier_service_id'] ?? null,
+                'tracking_number' => $data['tracking_number'] ?? null,
+                'verification_method' => $data['verification_method'] ?? null,
+                'verification_notes' => $data['verification_notes'] ?? null,
+                'return_reason' => $data['return_reason'] ?? null,
+            ], Auth::id());
+        } catch (OrderWorkflowException|\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
         }
 
-        if ($oldStatus !== $newStatus) {
-            $allowed = self::STATUS_TRANSITIONS[$oldStatus] ?? [];
-            if (! in_array($newStatus, $allowed, true)) {
-                return back()->with('error', "Cannot change status from {$oldStatus} to {$newStatus}.");
-            }
+        if ($from === $to) {
+            return back()->with('success', "Order {$order->invoice_no} details saved.");
         }
 
-        $courierServiceId = $request->filled('courier_service_id')
-            ? (int) $request->courier_service_id
-            : $order->courier_service_id;
-
-        if ($newStatus === 'shipped' && ! $courierServiceId) {
-            return back()->with('error', 'Select a courier service when marking as shipped. Add services under CMS → Courier Services.');
+        $msg = "Order {$order->invoice_no} updated to ".OrderStatus::label($to).'. Customer can now see this on tracking.';
+        if ($to === OrderStatus::COMPLETED && (float) ($order->courier_collected_amount ?? 0) > 0.009) {
+            $msg .= ' Collected ৳'.format_taka_number((float) $order->courier_collected_amount).' from courier (products only).';
         }
 
-        $courierService = $courierServiceId
-            ? CourierService::forShop($shopId)->find($courierServiceId)
-            : null;
+        return back()->with('success', $msg);
+    }
 
-        $isCod = $order->isCashOnDelivery();
-        $moneyCollected = $isCod
-            ? ($oldStatus === 'completed' || (float) $order->paid_amount > 0 || $order->courier_collected_at)
-            : ((float) $order->paid_amount > 0 || $oldStatus === 'completed');
+    /** Record how the order was verified with the customer and confirm it. */
+    public function verify(Request $request, Order $order)
+    {
+        $this->authorizeOrder($order);
 
-        if ($newStatus === 'refunded' && $oldStatus !== 'completed') {
-            return back()->with('error', 'Refund is only available after delivery. Use Returned if the order is not delivered yet.');
-        }
+        $data = $request->validate([
+            'verification_method' => ['required', Rule::in(array_keys(OrderStatus::VERIFICATION_METHODS))],
+            'verification_notes' => 'nullable|string|max:500',
+            'customer_note' => 'nullable|string|max:500',
+        ]);
 
-        if ($newStatus === 'returned' && $oldStatus === 'completed') {
-            return back()->with('error', 'This order is already delivered. Use Refund instead of Returned.');
+        if ($order->workflowStatus() !== OrderStatus::NEW) {
+            return back()->with('error', 'Only new orders can be verified.');
         }
 
         try {
-            DB::beginTransaction();
-
-            $paidAmount = $order->paid_amount;
-            $courierCollectedAt = $order->courier_collected_at;
-            $courierCollectedAmount = $order->courier_collected_amount;
-
-            if ($newStatus === 'completed' && $oldStatus !== 'completed') {
-                $dueFromCourier = max(0, round($order->shopCollectableAmount() - $order->shopAdvancePaid(), 2));
-                $paidAmount = $order->netPayable();
-                if (! $courierCollectedAt && $dueFromCourier > 0.009) {
-                    $courierCollectedAt = now();
-                    $courierCollectedAmount = $dueFromCourier;
-                } elseif (! $courierCollectedAt) {
-                    $courierCollectedAt = now();
-                    $courierCollectedAmount = 0;
-                }
-            }
-
-            if (in_array($newStatus, ['cancelled', 'returned', 'refunded'])) {
-                $paidAmount = 0;
-            }
-
-            $courierName = $courierService?->name ?: $order->shipping_courier;
-            $trackingNumber = $request->filled('tracking_number')
-                ? $request->tracking_number
-                : $order->shipping_tracking_no;
-
-            $order->update([
-                'status' => $newStatus,
-                'paid_amount' => $paidAmount,
-                'courier_service_id' => $courierServiceId,
-                'shipping_courier' => $courierName,
-                'shipping_tracking_no' => $trackingNumber,
-                'courier_collected_at' => $courierCollectedAt,
-                'courier_collected_amount' => $courierCollectedAmount,
-            ]);
-
-            $defaultNotes = [
-                'processing' => 'We are packing your items now.',
-                'shipped' => 'Your package is on the way to your delivery address.',
-                'completed' => 'Order delivered successfully.',
-                'cancelled' => 'This order was cancelled.',
-                'returned' => $isCod && ! $moneyCollected
-                    ? 'Order returned. COD was not collected — no customer refund.'
-                    : 'This order was returned to our store.',
-                'refunded' => 'This order was refunded.',
-            ];
-
-            $this->tracking->upsertLatestLog(
+            $this->workflow->verify(
                 $order,
-                $newStatus,
-                $request->customer_note ?: ($defaultNotes[$newStatus] ?? null),
-                $courierName,
-                $trackingNumber,
+                $data['verification_method'],
+                $data['verification_notes'] ?? null,
                 Auth::id(),
+                $data['customer_note'] ?? null,
             );
-
-            if ($newStatus === 'processing' && in_array($oldStatus, self::AWAITING_FULFILLMENT, true)) {
-                $order->load('items.product');
-                $this->stock->commitWebOrderStock($order, Auth::id());
-            }
-
-            // If an order skips packing and goes awaiting → shipped, still commit stock.
-            if ($newStatus === 'shipped' && in_array($oldStatus, [...self::AWAITING_FULFILLMENT, 'processing'], true)) {
-                $order->load('items.product');
-                $this->stock->commitWebOrderStock($order, Auth::id());
-            }
-
-            if ($newStatus === 'completed' && $oldStatus !== 'completed') {
-                $order->load('items.product');
-                $this->stock->commitWebOrderStock($order, Auth::id());
-                $this->accounts->postWebSettlement($order);
-            }
-
-            if (in_array($newStatus, ['cancelled', 'returned', 'refunded']) && ! in_array($oldStatus, ['cancelled', 'returned', 'refunded'])) {
-                $order->load('items.product', 'counter');
-                // Drop reservation (or restock physical if already packed).
-                $this->stock->releaseReservedStock($order, Auth::id(), 'order_'.$newStatus);
-                $this->accounts->postOrderRefund($order);
-            }
-
-            DB::commit();
-
-            $msg = "Order {$order->invoice_no} updated to ".ucfirst($newStatus).'. Customer can now see this on tracking.';
-            if ($newStatus === 'completed' && (float) ($courierCollectedAmount ?? 0) > 0.009) {
-                $msg .= ' Collected ৳'.format_taka_number((float) $courierCollectedAmount).' from courier (products only).';
-            }
-
-            return back()->with('success', $msg);
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            return back()->with('error', 'Something went wrong: '.$e->getMessage());
+        } catch (OrderWorkflowException|\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
         }
+
+        return back()->with('success', "Order {$order->invoice_no} verified and confirmed.");
     }
 
     /**
@@ -453,60 +378,23 @@ class OnlineOrderController extends Controller
      */
     public function collectFromCourier(Request $request, Order $order)
     {
-        $this->ensureAdmin();
-        if ($order->shop_id !== Auth::user()->shop_id || ! $order->isOnlineOrder()) {
-            abort(403, 'Unauthorized Access');
-        }
-
-        if ($order->status !== 'shipped') {
-            return back()->with('error', 'Only shipped orders can be collected from the courier.');
-        }
-
-        if ($order->courier_collected_at) {
-            return back()->with('error', 'Cash from this courier was already recorded.');
-        }
+        $this->authorizeOrder($order);
 
         $due = $order->amountDueFromCourier();
 
         try {
-            DB::beginTransaction();
-
-            $order->update([
-                'status' => 'completed',
-                'paid_amount' => $order->netPayable(),
-                'courier_collected_at' => now(),
-                'courier_collected_amount' => $due,
-            ]);
-
-            $this->tracking->upsertLatestLog(
-                $order,
-                'completed',
-                $due > 0.009
-                    ? 'Delivered. Collected ৳'.format_taka_number($due).' product COD from courier (delivery fee stays with courier).'
-                    : 'Order delivered successfully.',
-                $order->shipping_courier,
-                $order->shipping_tracking_no,
-                Auth::id(),
-            );
-
-            $order->load('items.product');
-            $this->stock->commitWebOrderStock($order, Auth::id());
-            $this->accounts->postWebSettlement($order);
-
-            DB::commit();
-
-            $service = $order->courierService?->name ?: ($order->shipping_courier ?: 'courier');
-
-            return back()->with(
-                'success',
-                $due > 0.009
-                    ? "Collected ৳".format_taka_number($due)." from {$service}. Order marked completed."
-                    : "Order marked completed. No COD was outstanding from {$service}."
-            );
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            return back()->with('error', 'Something went wrong: '.$e->getMessage());
+            $order = $this->workflow->collectFromCourier($order, Auth::id());
+        } catch (OrderWorkflowException|\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
         }
+
+        $service = $order->courierService?->name ?: ($order->shipping_courier ?: 'courier');
+
+        return back()->with(
+            'success',
+            $due > 0.009
+                ? 'Collected ৳'.format_taka_number($due)." from {$service}. Order marked completed."
+                : "Order marked completed. No COD was outstanding from {$service}."
+        );
     }
 }

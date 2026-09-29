@@ -4,9 +4,15 @@
     $money = fn ($n) => format_taka($n);
     $statusClass = [
         'completed' => 'bg-emerald-50 text-emerald-700',
+        'delivered' => 'bg-emerald-50 text-emerald-700',
+        'new' => 'bg-amber-50 text-amber-700',
         'pending' => 'bg-amber-50 text-amber-700',
+        'pending_fulfillment' => 'bg-amber-50 text-amber-700',
+        'confirmed' => 'bg-cyan-50 text-cyan-700',
         'processing' => 'bg-amber-50 text-amber-700',
+        'packed' => 'bg-indigo-50 text-indigo-700',
         'shipped' => 'bg-sky-50 text-sky-700',
+        'return_requested' => 'bg-yellow-50 text-yellow-700',
         'cancelled' => 'bg-rose-50 text-rose-700',
         'returned' => 'bg-slate-100 text-slate-600',
         'refunded' => 'bg-slate-100 text-slate-600',
@@ -468,7 +474,7 @@
                                 <td class="px-5 py-3 text-slate-600">{{ $order->customer->name ?? 'Walk-in' }}</td>
                                 <td class="px-5 py-3">
                                     <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold capitalize {{ $statusClass[$order->status] ?? 'bg-slate-100 text-slate-600' }}">
-                                        {{ $order->status }}
+                                        {{ \App\Support\OrderStatus::label($order->status) }}
                                     </span>
                                 </td>
                                 <td class="px-5 py-3 text-right font-bold text-slate-900">{{ $money($order->total_amount) }}</td>

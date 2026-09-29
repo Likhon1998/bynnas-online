@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\OrderStatus;
 use Illuminate\Database\Eloquent\Model;
 
 class Order extends Model
@@ -36,6 +37,16 @@ class Order extends Model
         'shipping_tracking_no',
         'courier_collected_at',
         'courier_collected_amount',
+        'shipped_at',
+        'delivered_at',
+
+        // Order verification (before processing) and returns
+        'verified_at',
+        'verified_by',
+        'verification_method',
+        'verification_notes',
+        'return_requested_at',
+        'return_reason',
 
         // Social / campaign attribution (online orders)
         'campaign_id',
@@ -47,6 +58,7 @@ class Order extends Model
         'landing_page',
         'referrer_host',
         'landing_page_id',
+        'lead_id',
 
         // Delivery details captured when the order was placed
         'delivery_name',
@@ -80,6 +92,10 @@ class Order extends Model
         'confirmation_charge' => 'decimal:2',
         'courier_collected_at' => 'datetime',
         'courier_collected_amount' => 'decimal:2',
+        'shipped_at' => 'datetime',
+        'delivered_at' => 'datetime',
+        'verified_at' => 'datetime',
+        'return_requested_at' => 'datetime',
         'exchange_credit' => 'decimal:2',
         'is_exchange_receipt' => 'boolean',
     ];
@@ -127,7 +143,7 @@ class Order extends Model
             return 0.0;
         }
 
-        if (! in_array((string) $this->status, ['shipped'], true)) {
+        if (! in_array((string) $this->status, [OrderStatus::SHIPPED, OrderStatus::DELIVERED], true)) {
             return 0.0;
         }
 
@@ -137,6 +153,27 @@ class Order extends Model
     public function courierService()
     {
         return $this->belongsTo(CourierService::class);
+    }
+
+    public function lead()
+    {
+        return $this->belongsTo(Lead::class);
+    }
+
+    public function verifier()
+    {
+        return $this->belongsTo(User::class, 'verified_by');
+    }
+
+    public function isVerified(): bool
+    {
+        return $this->verified_at !== null;
+    }
+
+    /** Status with legacy aliases folded (pending / pending_fulfillment → new). */
+    public function workflowStatus(): string
+    {
+        return OrderStatus::normalize($this->status);
     }
 
     /**

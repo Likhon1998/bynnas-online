@@ -59,7 +59,7 @@
         if (Auth::user()->isAdminUser()) {
             $pendingWebOrders = \App\Models\Order::where('shop_id', Auth::user()->shop_id)
                 ->onlineOrders()
-                ->whereIn('status', ['pending', 'pending_fulfillment'])
+                ->whereIn('status', \App\Support\OrderStatus::newValues())
                 ->count();
         }
     @endphp
@@ -118,6 +118,27 @@
            class="nav-link nav-tone-customers {{ request()->routeIs('customers.index', 'customers.create', 'customers.edit', 'customers.show') ? 'is-active' : '' }}">
             <span class="nav-ico-wrap"><svg class="nav-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg></span>
             <span class="nav-label">Customers</span>
+        </a>
+        @endcan
+
+        @can('manage leads')
+        @php
+            $leadsNeedingAction = \App\Models\Lead::forShop((int) Auth::user()->shop_id)
+                ->where(fn ($q) => $q->where('status', 'new')->orWhere(fn ($d) => $d->followUpDue()))
+                ->count();
+        @endphp
+        <a :title="sidebarCollapsed ? 'Leads' : null" href="{{ route('leads.index') }}"
+           class="nav-link nav-link--badge nav-tone-customers {{ request()->routeIs('leads.*') ? 'is-active' : '' }}">
+            <span class="nav-ico-wrap"><svg class="nav-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg></span>
+            <span class="nav-label">Leads</span>
+            @if($leadsNeedingAction > 0)
+                <span class="nav-badge">{{ $leadsNeedingAction }}</span>
+            @endif
+        </a>
+        <a :title="sidebarCollapsed ? 'Abandoned carts' : null" href="{{ route('abandoned-carts.index') }}"
+           class="nav-link nav-tone-customers {{ request()->routeIs('abandoned-carts.*') ? 'is-active' : '' }}">
+            <span class="nav-ico-wrap"><svg class="nav-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0zM13 9l-3 3m0-3l3 3"/></svg></span>
+            <span class="nav-label">Abandoned carts</span>
         </a>
         @endcan
 
@@ -377,6 +398,52 @@
             </div>
             @endif
         @endcan
+
+        @if(Auth::check())
+            <div class="relative"
+                 x-data="staffAlertBell(@js(route('notifications.feed')), @js(route('notifications.read-all')))"
+                 @keydown.escape.window="panelOpen = false"
+                 @click.outside="panelOpen = false">
+                <button type="button"
+                        @click="toggle()"
+                        class="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-800"
+                        :class="panelOpen ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : ''"
+                        title="Alerts: leads, low stock, abandoned carts, delivery issues"
+                        aria-haspopup="true"
+                        :aria-expanded="panelOpen">
+                    <svg class="h-4 w-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span x-show="unread > 0" x-cloak x-text="unread > 99 ? '99+' : unread"
+                          class="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-indigo-600 px-1 text-[9px] font-bold text-white"></span>
+                </button>
+
+                <div x-show="panelOpen" x-cloak x-transition.opacity.duration.150ms
+                     class="absolute right-0 top-[calc(100%+8px)] z-50 admin-fluid-panel overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10"
+                     style="display: none;">
+                    <div class="flex items-center justify-between border-b border-slate-100 px-3.5 py-2.5">
+                        <p class="text-[13px] font-bold text-slate-900">Alerts</p>
+                        <button type="button" x-show="unread > 0" @click="readAll()" class="text-[11px] font-semibold text-indigo-600 hover:underline">Mark all read</button>
+                    </div>
+                    <div class="max-h-[360px] overflow-y-auto">
+                        <template x-if="!loading && items.length === 0">
+                            <p class="px-4 py-8 text-center text-[12px] text-slate-400">No alerts yet.</p>
+                        </template>
+                        <template x-for="item in items" :key="item.id">
+                            <a :href="item.url || '#'" @click="open(item, $event)"
+                               class="block border-b border-slate-50 px-3.5 py-2.5 transition last:border-0"
+                               :class="item.is_new ? 'bg-indigo-50/70 hover:bg-indigo-50' : 'bg-white hover:bg-slate-50'">
+                                <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400" x-text="item.kind_label + ' · ' + item.at"></p>
+                                <p class="mt-0.5 text-[12px] font-bold text-slate-800" x-text="item.title"></p>
+                                <p class="mt-0.5 text-[11px] text-slate-500" x-text="item.body"></p>
+                            </a>
+                        </template>
+                    </div>
+                    <a href="{{ route('notifications.index') }}"
+                       class="block border-t border-slate-100 bg-slate-50 px-3.5 py-2.5 text-center text-[12px] font-bold text-indigo-700 hover:bg-slate-100">
+                        All notifications
+                    </a>
+                </div>
+            </div>
+        @endif
 
         <div class="flex items-center pl-0.5 sm:pl-1">
             <x-dropdown align="right" width="48">

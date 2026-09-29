@@ -33,7 +33,7 @@
                 'invoice' => $order->invoice_no,
                 'date' => asian_date($order->created_at, 'M j, Y'),
                 'datetime' => asian_datetime($order->created_at, 'M j, Y g:i A'),
-                'status' => $order->status === 'pending_fulfillment' ? 'pending' : $order->status,
+                'status' => \App\Support\OrderStatus::customerStep($order->status),
                 'status_label' => $track['status_label'] ?? ucfirst($order->status),
                 'total' => format_taka_number((float) $order->total_amount),
                 'where' => $track['where_is_product'] ?? '',
@@ -72,24 +72,25 @@
             this.detail = null;
         },
         statusClass(status) {
-            if (status === 'completed') return 'bg-emerald-100 text-emerald-700';
+            if (status === 'delivered') return 'bg-emerald-100 text-emerald-700';
             if (status === 'shipped') return 'bg-sky-100 text-sky-800';
             if (status === 'processing') return 'bg-amber-100 text-amber-800 ring-1 ring-amber-300';
-            if (status === 'pending' || status === 'pending_fulfillment') return 'bg-orange-100 text-orange-800';
+            if (status === 'confirmed') return 'bg-cyan-100 text-cyan-800';
+            if (status === 'new') return 'bg-orange-100 text-orange-800';
             if (['cancelled','returned','refunded'].includes(status)) return 'bg-rose-100 text-rose-700';
             return 'bg-slate-100 text-slate-700';
         },
         flowSteps: [
-            { key: 'pending', label: 'Received' },
+            { key: 'new', label: 'Received' },
+            { key: 'confirmed', label: 'Confirmed' },
             { key: 'processing', label: 'Preparing' },
             { key: 'shipped', label: 'In transit' },
-            { key: 'completed', label: 'Delivered' },
+            { key: 'delivered', label: 'Delivered' },
         ],
         buildTrack(order) {
             if (!order) return [];
-            const rankMap = { pending: 0, processing: 1, shipped: 2, completed: 3 };
-            const raw = order.status || 'pending';
-            const status = raw === 'pending_fulfillment' ? 'pending' : raw;
+            const rankMap = { new: 0, confirmed: 1, processing: 2, shipped: 3, delivered: 4 };
+            const status = order.status || 'new';
             const rank = Object.prototype.hasOwnProperty.call(rankMap, status) ? rankMap[status] : 0;
             const byKey = {};
             (order.timeline || []).forEach((s) => { if (s && s.key) byKey[s.key] = s; });
@@ -98,7 +99,7 @@
                 const active = typeof log.active === 'boolean' ? log.active : (step.key === status);
                 const passed = typeof log.done === 'boolean'
                     ? log.done
-                    : (i < rank || status === 'completed');
+                    : (i < rank || status === 'delivered');
                 return {
                     key: step.key,
                     label: step.label,
@@ -111,11 +112,9 @@
         },
         progressPct(order) {
             if (!order) return 0;
-            const rankMap = { pending: 0, processing: 1, shipped: 2, completed: 3 };
-            const raw = order.status || 'pending';
-            const status = raw === 'pending_fulfillment' ? 'pending' : raw;
-            const rank = rankMap[status] ?? 0;
-            return (rank / 3) * 100;
+            const rankMap = { new: 0, confirmed: 1, processing: 2, shipped: 3, delivered: 4 };
+            const rank = rankMap[order.status || 'new'] ?? 0;
+            return (rank / 4) * 100;
         },
      }"
      x-init="
@@ -228,10 +227,11 @@
                             index: 0,
                             touchStartX: null,
                             flowSteps: [
-                                { key: 'pending', label: 'Received' },
+                                { key: 'new', label: 'Received' },
+                                { key: 'confirmed', label: 'Confirmed' },
                                 { key: 'processing', label: 'Preparing' },
                                 { key: 'shipped', label: 'In transit' },
-                                { key: 'completed', label: 'Delivered' },
+                                { key: 'delivered', label: 'Delivered' },
                             ],
                             get current() { return this.slides[this.index] || null; },
                             get count() { return this.slides.length; },
@@ -239,9 +239,8 @@
                             get fillPct() { return this.progressPct(this.current); },
                             buildTrack(order) {
                                 if (!order) return [];
-                                const rankMap = { pending: 0, processing: 1, shipped: 2, completed: 3 };
-                                const raw = order.status || 'pending';
-                                const status = raw === 'pending_fulfillment' ? 'pending' : raw;
+                                const rankMap = { new: 0, confirmed: 1, processing: 2, shipped: 3, delivered: 4 };
+                                const status = order.status || 'new';
                                 const rank = Object.prototype.hasOwnProperty.call(rankMap, status) ? rankMap[status] : 0;
                                 const byKey = {};
                                 (order.timeline || []).forEach((s) => { if (s && s.key) byKey[s.key] = s; });
@@ -250,7 +249,7 @@
                                     const active = typeof log.active === 'boolean' ? log.active : (step.key === status);
                                     const passed = typeof log.done === 'boolean'
                                         ? log.done
-                                        : (i < rank || status === 'completed');
+                                        : (i < rank || status === 'delivered');
                                     return {
                                         key: step.key,
                                         label: step.label,
@@ -263,11 +262,9 @@
                             },
                             progressPct(order) {
                                 if (!order) return 0;
-                                const rankMap = { pending: 0, processing: 1, shipped: 2, completed: 3 };
-                                const raw = order.status || 'pending';
-                                const status = raw === 'pending_fulfillment' ? 'pending' : raw;
-                                const rank = rankMap[status] ?? 0;
-                                return (rank / 3) * 100;
+                                const rankMap = { new: 0, confirmed: 1, processing: 2, shipped: 3, delivered: 4 };
+                                const rank = rankMap[order.status || 'new'] ?? 0;
+                                return (rank / 4) * 100;
                             },
                             prev() { if (this.count < 2) return; this.index = (this.index - 1 + this.count) % this.count; },
                             next() { if (this.count < 2) return; this.index = (this.index + 1) % this.count; },
@@ -281,10 +278,11 @@
                                 this.touchStartX = null;
                             },
                             statusClass(status) {
-                                if (status === 'completed') return 'bg-emerald-100 text-emerald-700';
+                                if (status === 'delivered') return 'bg-emerald-100 text-emerald-700';
                                 if (status === 'shipped') return 'bg-sky-100 text-sky-800';
                                 if (status === 'processing') return 'bg-amber-100 text-amber-800 ring-1 ring-amber-300';
-                                if (status === 'pending' || status === 'pending_fulfillment') return 'bg-orange-100 text-orange-800';
+                                if (status === 'confirmed') return 'bg-cyan-100 text-cyan-800';
+                                if (status === 'new') return 'bg-orange-100 text-orange-800';
                                 if (status === 'cancelled' || status === 'returned' || status === 'refunded') return 'bg-rose-100 text-rose-700';
                                 return 'bg-slate-100 text-slate-700';
                             }
@@ -309,7 +307,7 @@
                                         <p class="acct-active-order__invoice" x-text="current.invoice"></p>
                                         <p class="acct-active-order__meta" x-show="current.id" x-text="'Ref #' + current.id + ' · Placed ' + current.date"></p>
                                     </div>
-                                    <span class="acct-active-order__badge" :data-status="current.status" x-text="current.status_label"></span>
+                                    <span class="acct-active-order__badge" :data-status="current.status === 'delivered' ? 'completed' : current.status" x-text="current.status_label"></span>
                                 </div>
 
                                 <div class="acct-active-order__status" x-show="current.where">
@@ -326,7 +324,7 @@
                                                 'is-waiting': !step.done && !step.active
                                             }">
                                             <div class="acct-timeline__marker" aria-hidden="true">
-                                                <span class="acct-timeline__dot" x-text="step.done || (step.active && current.status === 'completed') ? '✓' : (sIdx + 1)"></span>
+                                                <span class="acct-timeline__dot" x-text="step.done || (step.active && current.status === 'delivered') ? '✓' : (sIdx + 1)"></span>
                                                 <span class="acct-timeline__line" x-show="sIdx < 3"></span>
                                             </div>
                                             <div class="acct-timeline__content">
@@ -429,13 +427,7 @@
                                         <p class="text-[13px] font-bold text-slate-900 break-all">{{ $order->invoice_no }}</p>
                                         <p class="text-[10px] text-slate-400">#{{ $order->id }} · {{ asian_date($order->created_at, 'M j, Y') }}</p>
                                     </div>
-                                    <span class="shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-extrabold
-                                        @if($order->status === 'completed') bg-emerald-100 text-emerald-700
-                                        @elseif($order->status === 'shipped') bg-sky-100 text-sky-800
-                                        @elseif($order->status === 'processing') bg-amber-100 text-amber-800
-                                        @elseif($order->status === 'pending') bg-orange-100 text-orange-800
-                                        @elseif(in_array($order->status, ['cancelled', 'returned', 'refunded'])) bg-rose-100 text-rose-700
-                                        @else bg-slate-100 text-slate-700 @endif">
+                                    <span class="shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-extrabold {{ \App\Support\OrderStatus::customerBadgeClass($order->status) }}">
                                         {{ $track['status_label'] ?? ucfirst($order->status) }}
                                     </span>
                                 </div>
@@ -488,13 +480,7 @@
                                         </td>
                                         <td class="px-2 py-3 text-right font-bold text-slate-900 whitespace-nowrap">{{ format_taka($order->total_amount, $currency) }}</td>
                                         <td class="px-2 py-3">
-                                            <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-extrabold
-                                                @if($order->status === 'completed') bg-emerald-100 text-emerald-700
-                                                @elseif($order->status === 'shipped') bg-sky-100 text-sky-800
-                                                @elseif($order->status === 'processing') bg-amber-100 text-amber-800 ring-1 ring-amber-300
-                                                @elseif($order->status === 'pending') bg-orange-100 text-orange-800
-                                                @elseif(in_array($order->status, ['cancelled', 'returned', 'refunded'])) bg-rose-100 text-rose-700
-                                                @else bg-slate-100 text-slate-700 @endif">
+                                            <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-extrabold {{ \App\Support\OrderStatus::customerBadgeClass($order->status) }}">
                                                 {{ $track['status_label'] ?? ucfirst($order->status) }}
                                             </span>
                                         </td>
@@ -612,7 +598,7 @@
                             </button>
                         </div>
                         <div class="acct-order-sheet__hero-row">
-                            <span class="acct-order-sheet__badge" :data-status="detail.status" x-text="detail.status_label"></span>
+                            <span class="acct-order-sheet__badge" :data-status="detail.status === 'delivered' ? 'completed' : detail.status" x-text="detail.status_label"></span>
                             <div class="acct-order-sheet__total">
                                 <p class="acct-order-sheet__total-label">Amount paid</p>
                                 <p class="acct-order-sheet__total-value" x-text="'{{ $currency }}' + detail.total"></p>
@@ -642,7 +628,7 @@
                                             'is-waiting': !step.done && !step.active
                                         }">
                                         <div class="acct-timeline__marker" aria-hidden="true">
-                                            <span class="acct-timeline__dot" x-text="step.done || (step.active && detail.status === 'completed') ? '✓' : (sIdx + 1)"></span>
+                                            <span class="acct-timeline__dot" x-text="step.done || (step.active && detail.status === 'delivered') ? '✓' : (sIdx + 1)"></span>
                                             <span class="acct-timeline__line" x-show="sIdx < 3"></span>
                                         </div>
                                         <div class="acct-timeline__content">
