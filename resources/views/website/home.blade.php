@@ -38,7 +38,6 @@
     }
 @endphp
 <section class="bb-hero">
-    <div class="tn-container">
         <div class="bb-hero-panel"
              x-data="{
                 slide: 0,
@@ -51,29 +50,6 @@
                 }
              }"
              x-init="arm()">
-            <div class="bb-hero-copy">
-                <h1 class="bb-hero-title">{{ $heroTitle }}</h1>
-                <p class="bb-hero-sub">{{ $heroSubtitle }}</p>
-                <div class="bb-hero-actions">
-                    <a href="{{ route('website.shop') }}" class="bb-btn bb-btn--coral">
-                        Shop Now
-                        <span class="bb-btn-arrow">@include('website.partials.bb-icon', ['name' => 'arrow-right'])</span>
-                    </a>
-                    <a href="{{ route('website.shop', ['filter' => 'new']) }}" class="bb-btn bb-btn--ghost">Explore Collection</a>
-                </div>
-                <ul class="bb-hero-trust">
-                    @foreach($heroTrust as $trust)
-                        <li>
-                            <span class="bb-hero-trust-ico">@include('website.partials.lottie', ['name' => $trust['lottie']])</span>
-                            <span>
-                                <strong>{{ $trust['title'] }}</strong>
-                                <small>{{ $trust['sub'] }}</small>
-                            </span>
-                        </li>
-                    @endforeach
-                </ul>
-            </div>
-
             <div class="bb-hero-media">
                 @foreach($heroImages as $i => $image)
                     <a href="{{ $image->url }}"
@@ -84,18 +60,51 @@
                         <img src="{{ $image->src }}" alt="{{ $image->title }}" class="bb-fill" decoding="async" @if($i === 0) fetchpriority="high" @else loading="lazy" @endif>
                     </a>
                 @endforeach
+            </div>
+
+            <div class="tn-container bb-hero-inner">
+                <div class="bb-hero-copy">
+                    <h1 class="bb-hero-title">{{ $heroTitle }}</h1>
+                    <p class="bb-hero-sub">{{ $heroSubtitle }}</p>
+                    <div class="bb-hero-actions">
+                        <a href="{{ route('website.shop') }}" class="bb-btn bb-btn--coral">
+                            Shop Now
+                            <span class="bb-btn-arrow">@include('website.partials.bb-icon', ['name' => 'arrow-right'])</span>
+                        </a>
+                        <a href="{{ route('website.shop', ['filter' => 'new']) }}" class="bb-btn bb-btn--ghost">Explore Collection</a>
+                    </div>
+                    <ul class="bb-hero-trust">
+                        @foreach($heroTrust as $trust)
+                            <li>
+                                <span class="bb-hero-trust-ico">@include('website.partials.lottie', ['name' => $trust['lottie']])</span>
+                                <span>
+                                    <strong>{{ $trust['title'] }}</strong>
+                                    <small>{{ $trust['sub'] }}</small>
+                                </span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+
                 <span class="bb-hero-badge" aria-hidden="true">
                     <span class="bb-hero-badge-peek">@include('website.partials.lottie', ['name' => 'chick'])</span>
                     <span>{{ $heroBadge }}</span>
                 </span>
             </div>
 
+            @if($heroImages->count() > 1)
+                <div class="bb-hero-dots" role="tablist" aria-label="Hero slides">
+                    @foreach($heroImages as $i => $image)
+                        <button type="button" class="bb-hero-dot" :class="{ 'is-active': slide === {{ $i }} }" @click="go({{ $i }})" aria-label="Show slide {{ $i + 1 }}"></button>
+                    @endforeach
+                </div>
+            @endif
+
             <span class="bb-hero-deco bb-hero-deco--balloon">@include('website.partials.lottie', ['name' => 'balloon'])</span>
-            <span class="bb-hero-deco bb-hero-deco--rainbow">@include('website.partials.lottie', ['name' => 'rainbow'])</span>
             <span class="bb-hero-deco bb-hero-deco--spark">@include('website.partials.lottie', ['name' => 'sparkles'])</span>
             <span class="bb-hero-deco bb-hero-deco--star">@include('website.partials.lottie', ['name' => 'star'])</span>
+            <span class="bb-hero-wave" aria-hidden="true"></span>
         </div>
-    </div>
 </section>
 
 {{-- Shop by Categories --}}
