@@ -1138,99 +1138,6 @@
     .bb-review-card { scroll-snap-align: start; }
 }
 
-/* ---------- Newsletter ---------- */
-.bb-newsletter-wrap { padding: 56px 0 64px; }
-.bb-newsletter {
-    position: relative;
-    overflow: hidden;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.1fr);
-    align-items: center;
-    gap: 18px 24px;
-    padding: 28px 150px 28px 32px;
-    border-radius: 30px;
-    background: linear-gradient(110deg, #fdeee3 0%, #fbe6d8 55%, #f3e9fb 100%);
-}
-.bb-newsletter-ico {
-    width: 60px;
-    height: 60px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 4px 0 #f6d9c8, 0 8px 20px rgba(214, 150, 118, .2);
-}
-.bb-newsletter-ico .bb-lottie { width: 40px; height: 40px; }
-.gaget-store .bb-newsletter-copy h3 {
-    margin: 0 0 4px;
-    font-family: var(--bb-font-display);
-    font-size: 22px;
-    font-weight: 600;
-    color: var(--bb-ink);
-}
-.bb-newsletter-copy p { margin: 0; font-size: 13.5px; line-height: 1.55; color: #7a655b; }
-.bb-newsletter-form {
-    position: relative;
-    z-index: 2;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px;
-    border-radius: 999px;
-    background: #fff;
-    box-shadow: 0 8px 22px rgba(214, 150, 118, .16);
-}
-.gaget-store .bb-newsletter-form input {
-    flex: 1;
-    min-width: 0;
-    height: 44px;
-    padding: 0 16px;
-    border: 0;
-    background: transparent;
-    font-size: 14px;
-    color: var(--bb-ink);
-}
-.gaget-store .bb-newsletter-form input:focus { box-shadow: none; }
-.bb-newsletter-form button {
-    height: 44px;
-    padding: 0 24px;
-    border: 0;
-    border-radius: 999px;
-    background: var(--bb-purple);
-    color: #fff;
-    font-size: 14px;
-    font-weight: 800;
-    cursor: pointer;
-    transition: background .18s ease;
-}
-.bb-newsletter-form button:hover { background: var(--bb-purple-deep); }
-.bb-newsletter-ok,
-.bb-newsletter-err {
-    grid-column: 2 / -1;
-    margin: -6px 0 0;
-    font-size: 13px;
-    font-weight: 700;
-}
-.bb-newsletter-ok { color: #4f7a3f; }
-.bb-newsletter-err { color: #c0392b; }
-.bb-newsletter-sun { position: absolute; right: 34px; top: 50%; width: 76px; height: 76px; transform: translateY(-50%); z-index: 1; }
-.bb-newsletter-cloud { position: absolute; right: 86px; bottom: 2px; width: 56px; height: 56px; z-index: 1; animation: bb-float 5s ease-in-out infinite; }
-.bb-newsletter-sun .bb-lottie,
-.bb-newsletter-cloud .bb-lottie { width: 100%; height: 100%; }
-@media (max-width: 1024px) {
-    .bb-newsletter { grid-template-columns: auto minmax(0, 1fr); padding-right: 32px; }
-    .bb-newsletter-form { grid-column: 1 / -1; }
-    .bb-newsletter-ok,
-    .bb-newsletter-err { grid-column: 1 / -1; margin: 0; }
-    .bb-newsletter-sun,
-    .bb-newsletter-cloud { display: none; }
-}
-@media (max-width: 520px) {
-    .bb-newsletter { padding: 24px 18px; border-radius: 24px; }
-    .bb-newsletter-ico { width: 48px; height: 48px; }
-    .bb-newsletter-form button { padding: 0 16px; }
-}
-
 /* ---------- Footer ---------- */
 .gaget-store .bb-footer { background: #fff; border-top: 1px solid var(--bb-line); }
 .gaget-store .bb-footer .tn-footer-shell { padding-top: 52px; padding-bottom: 40px; }
@@ -1442,8 +1349,6 @@
 .bb-hero-badge-peek .bb-lottie,
 .bb-why-badge-peek .bb-lottie,
 .bb-why-kite .bb-lottie { width: 100%; height: 100%; }
-.gaget-page-loader__core .bb-lottie-fallback { font-size: 24px; }
-
 .bb-cart-empty-lottie { width: 96px !important; height: 96px !important; background: #fff !important; border-radius: 50%; box-shadow: 0 6px 0 #f6d9c8; }
 .bb-cart-empty-lottie .bb-lottie { width: 64px; height: 64px; }
 .bb-success-lottie { width: 96px; height: 96px; display: grid; place-items: center; border-radius: 50%; background: #fff; box-shadow: 0 6px 0 #e7dcfb, 0 14px 28px rgba(139, 111, 214, .18); }
@@ -1516,9 +1421,6 @@
     transition: transform .18s cubic-bezier(.34, 1.56, .64, 1), box-shadow .18s ease, background .18s ease, color .18s ease;
 }
 .bb-btn--ghost:hover { transform: translateY(-3px); box-shadow: 0 6px 0 #dccdf7; border-color: #dccdf7; }
-.bb-newsletter-form button { box-shadow: 0 4px 0 #6a4bb8; transition: transform .18s cubic-bezier(.34, 1.56, .64, 1), background .18s ease; }
-.bb-newsletter-form button:hover { transform: translateY(-2px); }
-
 /* Category cards: pastel ring + wiggle */
 .bb-cat-card { border: 2px solid var(--tint); box-shadow: 0 5px 0 var(--tint); }
 .bb-cat-card:hover { animation: bb-wiggle .5s ease-in-out; transform: translateY(-5px); box-shadow: 0 9px 0 var(--tint), 0 18px 30px rgba(74, 48, 38, .08); border-color: var(--tint); }
@@ -1558,7 +1460,6 @@
 .bb-review-card { border-width: 2px; box-shadow: 0 5px 0 #f3e6fb; }
 .bb-review-card:nth-child(2) { transform: rotate(.6deg); }
 .bb-review-card:nth-child(3) { transform: rotate(-.6deg); }
-.bb-newsletter { border: 2px solid #f6ddcc; box-shadow: 0 6px 0 #f3e2f6; }
 /* Wavy top edge on the footer */
 .gaget-store .bb-footer { position: relative; margin-top: 70px; border-top: 0; }
 .gaget-store .bb-footer::before {
@@ -1747,7 +1648,6 @@
     .bb-hero-slide.is-active img,
     .bb-combo-deco--balloon,
     .bb-why-kite,
-    .bb-newsletter-cloud,
     .bb-cat-card:hover,
     .gaget-store .tn-product-add:hover,
     .gaget-store .gaget-action-btn--cart:hover svg { animation: none !important; }

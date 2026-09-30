@@ -71,11 +71,11 @@ class WipeStorefrontContentSeeder extends Seeder
         if (Schema::hasTable('users')) {
             DB::table('model_has_roles')->whereNotIn(
                 'model_id',
-                DB::table('users')->where('email', env('ADMIN_EMAIL', 'admin@bynnas.com'))->pluck('id')
+                DB::table('users')->where('email', AdminUserSeeder::EMAIL)->pluck('id')
             )->delete();
 
             DB::table('users')
-                ->where('email', '!=', env('ADMIN_EMAIL', 'admin@bynnas.com'))
+                ->where('email', '!=', AdminUserSeeder::EMAIL)
                 ->delete();
         }
 

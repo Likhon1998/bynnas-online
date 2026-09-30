@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Shop;
 use App\Models\SiteSetting;
-use App\Models\User;
 use Illuminate\Database\Seeder;
 
 /**
@@ -17,30 +16,15 @@ class ProductionSeeder extends Seeder
     {
         $this->call(RolesAndPermissionsSeeder::class);
 
-        $shop = Shop::updateOrCreate(
-            ['email' => env('ADMIN_EMAIL', 'admin@bynnas.com')],
-            [
-                'name' => env('SHOP_NAME', 'Bynnas Social'),
-                'phone' => null,
-                'address' => null,
-                'is_active' => true,
-            ]
-        );
+        $shop = Shop::query()->orderBy('id')->first() ?? Shop::create([
+            'name' => env('SHOP_NAME', 'Bynnas Social'),
+            'email' => AdminUserSeeder::EMAIL,
+            'phone' => null,
+            'address' => null,
+            'is_active' => true,
+        ]);
 
-        $password = env('ADMIN_PASSWORD', '12345678');
-
-        $admin = User::updateOrCreate(
-            ['email' => env('ADMIN_EMAIL', 'admin@bynnas.com')],
-            [
-                'shop_id' => $shop->id,
-                'role' => 'admin',
-                'name' => env('ADMIN_NAME', 'Admin'),
-                'password' => $password,
-                'email_verified_at' => now(),
-            ]
-        );
-
-        $admin->syncRoles(['Admin']);
+        $this->call(AdminUserSeeder::class);
 
         // Keep one settings row so the storefront does not crash; leave marketing fields null.
         $settings = SiteSetting::query()->first() ?? new SiteSetting;

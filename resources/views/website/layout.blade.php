@@ -758,17 +758,19 @@
         /* Critical first-paint loader (before Vite CSS) */
         .gaget-page-loader{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#fffaf5;opacity:1;visibility:visible;pointer-events:auto;transition:opacity .32s ease,visibility 0s linear 0s}
         .gaget-page-loader.is-hidden{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .32s ease,visibility 0s linear .32s}
-        .gaget-page-loader__inner{display:flex;flex-direction:column;align-items:center;gap:14px}
-        .gaget-page-loader__mark{position:relative;width:64px;height:64px;display:grid;place-items:center}
-        .gaget-page-loader__ring{position:absolute;inset:0;border-radius:50%;border:2.5px solid #f2e6dc;border-top-color:#ec8560;animation:gaget-spin .75s linear infinite}
-        .gaget-page-loader__core{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:#fff;box-shadow:0 8px 20px rgba(139, 111, 214,.22);overflow:hidden}
-        .gaget-page-loader__core .bb-lottie{width:36px;height:36px}
-        .gaget-page-loader__text{margin:0;font-family:'Fredoka','Nunito',sans-serif;font-size:19px;font-weight:600;color:#3a2a24}
-        .gaget-page-loader__sub{margin:0;font-size:12px;font-weight:500;color:#8c776d}
+        .gaget-page-loader__inner{display:flex;flex-direction:column;align-items:center;gap:10px}
+        .gaget-page-loader__balls{display:flex;align-items:flex-end;gap:7px;height:30px}
+        .gaget-page-loader__balls i{display:block;width:11px;height:11px;border-radius:50%;background:#ec8560;box-shadow:inset -2px -2px 0 rgba(0,0,0,.08);transform-origin:50% 100%;animation:gaget-ball-hop .8s cubic-bezier(.45,0,.55,1) infinite}
+        .gaget-page-loader__balls i:nth-child(2){background:#8b6fd6;animation-delay:.13s}
+        .gaget-page-loader__balls i:nth-child(3){background:#f4b740;animation-delay:.26s}
+        .gaget-page-loader__text{margin:0;font-family:'Fredoka','Nunito',sans-serif;font-size:13px;font-weight:600;letter-spacing:.02em;color:#8c776d}
+        .gaget-page-loader__msg{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
         .gaget-page-loader__bar{position:absolute;top:0;left:0;height:2px;width:0;background:linear-gradient(90deg,#ec8560,#b39cf0)}
         .gaget-page-loader.is-active:not(.is-hidden) .gaget-page-loader__bar{animation:gaget-bar-run 1.35s ease-in-out infinite}
-        @keyframes gaget-spin{to{transform:rotate(360deg)}}
+        .gaget-page-loader.is-hidden .gaget-page-loader__balls i{animation:none}
+        @keyframes gaget-ball-hop{0%,100%{transform:translateY(0) scale(1.25,.75)}18%{transform:translateY(0) scale(1)}50%{transform:translateY(-18px) scale(.92,1.08)}82%{transform:translateY(0) scale(1)}}
         @keyframes gaget-bar-run{0%{width:0;left:0}45%{width:55%;left:0}100%{width:0;left:100%}}
+        @media (prefers-reduced-motion:reduce){.gaget-page-loader__balls i{animation:none}}
 
         /* Critical cart fly + drawer animations (always available) */
         .gaget-cart-flyer{position:fixed;z-index:100060;width:64px;height:64px;margin:0;padding:0;border:0;border-radius:18px;overflow:hidden;pointer-events:none;background:#fff;box-shadow:0 16px 36px rgba(74, 48, 38,.28),0 0 0 3px rgba(236, 133, 96,.25);opacity:1;will-change:left,top,transform,opacity}
@@ -820,12 +822,9 @@
 <div id="gaget-page-loader" class="gaget-page-loader is-active" role="status" aria-live="polite" aria-busy="true" aria-label="Loading">
     <div class="gaget-page-loader__bar" aria-hidden="true"></div>
     <div class="gaget-page-loader__inner">
-        <div class="gaget-page-loader__mark" aria-hidden="true">
-            <span class="gaget-page-loader__ring"></span>
-            <span class="gaget-page-loader__core">@include('website.partials.lottie', ['name' => 'bear'])</span>
-        </div>
+        <div class="gaget-page-loader__balls" aria-hidden="true"><i></i><i></i><i></i></div>
         <p class="gaget-page-loader__text">{{ $settings->store_name ?? config('app.name', 'Bynnas Social') }}</p>
-        <p class="gaget-page-loader__sub" id="gaget-loader-msg">Loading</p>
+        <span class="gaget-page-loader__msg" id="gaget-loader-msg">Loading</span>
     </div>
 </div>
 

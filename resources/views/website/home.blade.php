@@ -384,31 +384,4 @@
 </section>
 @endif
 
-{{-- Newsletter --}}
-<section class="bb-newsletter-wrap" id="newsletter">
-    <div class="tn-container">
-        <div class="bb-newsletter">
-            <span class="bb-newsletter-ico">@include('website.partials.lottie', ['name' => 'love-letter'])</span>
-            <div class="bb-newsletter-copy">
-                <h3>{{ $homeCopy['newsletter_title'] ?? 'Join Our '.$storeName.' Family' }}</h3>
-                <p>{{ $homeCopy['newsletter_text'] ?? 'Get special offers and new arrivals straight to your inbox.' }}</p>
-            </div>
-            <form method="POST" action="{{ route('website.newsletter') }}" class="bb-newsletter-form">
-                @csrf
-                <label for="bb-newsletter-email" class="sr-only">Email address</label>
-                <input id="bb-newsletter-email" type="email" name="email" required maxlength="255" placeholder="Enter your email address" autocomplete="email">
-                <button type="submit">Subscribe</button>
-            </form>
-            @if(session('newsletter_success'))
-                <p class="bb-newsletter-ok" role="status">{{ session('newsletter_success') }}</p>
-            @endif
-            @error('email')
-                <p class="bb-newsletter-err" role="alert">{{ $message }}</p>
-            @enderror
-            <span class="bb-newsletter-sun">@include('website.partials.lottie', ['name' => 'sun'])</span>
-            <span class="bb-newsletter-cloud">@include('website.partials.lottie', ['name' => 'cloud'])</span>
-        </div>
-    </div>
-</section>
-
 @endsection
