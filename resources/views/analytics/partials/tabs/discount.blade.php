@@ -38,7 +38,7 @@
                         <tr class="hover:bg-gray-50/80">
                             <td class="px-5 py-3 font-semibold text-gray-900">{{ $order->invoice_no }}</td>
                             <td class="px-5 py-3 text-gray-500 whitespace-nowrap">{{ $order->created_at->format('d M Y') }}</td>
-                            <td class="px-5 py-3">{{ $order->customer?->name ?? 'Walk-in' }}</td>
+                            <td class="px-5 py-3">{{ $order->delivery_name ?: ($order->customer?->name ?? 'Guest') }}</td>
                             <td class="px-5 py-3 text-right font-medium">{{ format_taka($order->total_amount) }}</td>
                             <td class="px-5 py-3 text-right font-bold text-amber-600">{{ format_taka($order->discount_amount) }}</td>
                             <td class="px-5 py-3 text-right font-bold text-gray-900">{{ format_taka($order->netPayable()) }}</td>

@@ -1,5 +1,6 @@
 @php
     use App\Support\AccountUi;
+    $retail = retail_enabled();
 @endphp
 
 <div class="space-y-4">
@@ -37,7 +38,7 @@
                         <tr>
                             <th class="px-6 py-3 text-left">Date</th>
                             <th class="px-6 py-3 text-left">Description</th>
-                            <th class="px-6 py-3 text-left">Counter</th>
+                            @if($retail)<th class="px-6 py-3 text-left">Counter</th>@endif
                             <th class="px-6 py-3 text-right">Debit</th>
                             <th class="px-6 py-3 text-right">Credit</th>
                             <th class="px-6 py-3 text-right">Balance</th>
@@ -48,14 +49,14 @@
                             <tr class="hover:bg-gray-50/80">
                                 <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ $row['entry']->transaction->transaction_date->format('d M Y') }}</td>
                                 <td class="px-6 py-4 text-gray-900">{{ $row['entry']->transaction->description }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ $row['entry']->counter?->name ?? '—' }}</td>
+                                @if($retail)<td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ $row['entry']->counter?->name ?? '—' }}</td>@endif
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-gray-700">{{ $row['debit'] > 0 ? format_taka($row['debit']) : '—' }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-gray-700">{{ $row['credit'] > 0 ? format_taka($row['credit']) : '—' }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right font-bold text-gray-900">{{ format_taka($row['balance']) }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="px-6 py-12 text-center text-gray-400">No entries in this period.</td>
+                                <td colspan="{{ $retail ? 6 : 5 }}" class="px-6 py-12 text-center text-gray-400">No entries in this period.</td>
                             </tr>
                         @endforelse
                     </tbody>

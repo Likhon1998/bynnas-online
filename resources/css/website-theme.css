@@ -1832,3 +1832,217 @@
     .gaget-store .bb-product-grid--combo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .gaget-store .bb-section { padding-top: 38px; }
 }
+
+/* ---------- CMS promo banners (deals grid, hero cards, mid strip) ---------- */
+.gaget-store .bb-head-accent { color: var(--bb-coral-deep); }
+.bb-promo {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: flex-end;
+    min-height: 250px;
+    overflow: hidden;
+    border-radius: 22px;
+    background: var(--bb-peach);
+    border: 2px solid #f6e7dc;
+    box-shadow: 0 5px 0 #f6e7dc;
+    color: #fff;
+    text-decoration: none;
+    transition: transform .25s cubic-bezier(.34, 1.56, .64, 1), box-shadow .2s ease;
+}
+.bb-promo:hover { transform: translateY(-4px); box-shadow: 0 9px 0 #f6e7dc, 0 18px 30px rgba(74, 48, 38, .1); }
+.bb-promo.is-wide { min-height: 190px; }
+.bb-promo-img {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform .5s ease;
+}
+.bb-promo:hover .bb-promo-img { transform: scale(1.05); }
+.bb-promo-shade { position: absolute; inset: 0; z-index: -1; }
+.bb-promo.is-dark .bb-promo-shade { background: linear-gradient(180deg, rgba(42, 30, 25, .05) 20%, rgba(42, 30, 25, .82) 100%); }
+.bb-promo.is-light { color: var(--bb-ink); }
+.bb-promo.is-light .bb-promo-shade { background: linear-gradient(180deg, rgba(255, 250, 245, 0) 25%, rgba(255, 250, 245, .95) 72%); }
+.bb-promo-corner {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: var(--bb-coral);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    transform: rotate(4deg);
+    box-shadow: 0 3px 0 #cf6440;
+}
+.bb-promo-body { display: flex; flex-direction: column; gap: 5px; width: 100%; padding: 16px 16px 15px; }
+.bb-promo-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.bb-promo-badge {
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .92);
+    color: var(--bb-purple-deep);
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.bb-promo-badge.is-soft { background: var(--bb-lavender); }
+.bb-promo-title { font-family: var(--bb-font-display); font-size: 20px; font-weight: 600; line-height: 1.2; }
+.bb-promo-sub { font-size: 13px; line-height: 1.45; opacity: .95; }
+.bb-promo-sub mark { background: none; color: #ffd7c4; font-weight: 800; }
+.bb-promo.is-light .bb-promo-sub mark { color: var(--bb-coral-deep); }
+.bb-promo-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; }
+.bb-promo-price { font-size: 12.5px; }
+.bb-promo-price b { font-size: 15px; }
+.bb-promo-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    padding: 7px 13px;
+    border-radius: 999px;
+    background: var(--bb-coral);
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+.bb-promo-cta svg { width: 14px; height: 14px; }
+.bb-promo-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--bb-promo-count, 4), minmax(0, 1fr));
+    gap: 16px;
+}
+.bb-promo-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.gaget-store .bb-hero-cards { padding-top: 24px; }
+.bb-promo-rail {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: calc((100% - 2 * 16px) / 3);
+    gap: 16px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding: 2px 1px 12px;
+}
+.bb-promo-rail::-webkit-scrollbar { display: none; }
+.bb-promo-rail > .bb-promo { scroll-snap-align: start; }
+@media (max-width: 1023px) {
+    .bb-promo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .bb-promo-rail { grid-auto-columns: calc((100% - 16px) / 2); }
+}
+@media (max-width: 600px) {
+    .bb-promo-grid,
+    .bb-promo-rail {
+        grid-template-columns: none;
+        grid-auto-flow: column;
+        grid-auto-columns: 82%;
+        gap: 12px;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+    }
+    .bb-promo-grid > .bb-promo { scroll-snap-align: start; }
+    .bb-promo { min-height: 220px; }
+}
+
+/* Announcement strip (CMS special offer text + top-bar menu) */
+.bb-topbar { pointer-events: auto; background: var(--bb-purple-deep); color: #fff; }
+.bb-topbar-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    max-width: 1280px;
+    min-height: 30px;
+    margin: 0 auto;
+    padding: 4px 24px;
+    font-size: 12.5px;
+    font-weight: 700;
+}
+.bb-topbar-offer { display: inline-flex; align-items: center; gap: 6px; margin: 0; text-align: center; }
+.bb-topbar-offer svg { width: 12px; height: 12px; color: #ffd7c4; flex-shrink: 0; }
+.bb-topbar-links { display: flex; gap: 16px; margin-left: auto; }
+.bb-topbar-offer + .bb-topbar-links { padding-left: 16px; }
+.bb-topbar-links a { color: #fff; text-decoration: none; opacity: .92; }
+.bb-topbar-links a:hover { opacity: 1; text-decoration: underline; }
+@media (max-width: 640px) {
+    .bb-topbar-inner { padding: 4px 12px; font-size: 11.5px; }
+    .bb-topbar-offer + .bb-topbar-links { display: none; }
+}
+
+/* Trusted-by line under "Why choose us" */
+.bb-why-trusted {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 18px 0 0;
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: var(--bb-sage);
+    color: #4d6340;
+    font-size: 13px;
+    font-weight: 700;
+}
+.bb-why-trusted svg { width: 17px; height: 17px; }
+
+/* ---------- Brands strip ---------- */
+.bb-brand-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 12px; }
+.bb-brand-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 14px 10px 12px;
+    border-radius: 20px;
+    background: #fff;
+    border: 2px solid #f6e7dc;
+    box-shadow: 0 4px 0 #f6e7dc;
+    color: inherit;
+    text-align: center;
+    text-decoration: none;
+    transition: transform .22s cubic-bezier(.34, 1.56, .64, 1), border-color .2s ease;
+}
+.bb-brand-chip:hover { transform: translateY(-4px); border-color: #dccdf7; }
+.bb-brand-chip img { width: auto; max-width: 100%; height: 44px; object-fit: contain; }
+.bb-brand-letter {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--bb-lavender);
+    color: var(--bb-purple-deep);
+    font-family: var(--bb-font-display);
+    font-size: 24px;
+    font-weight: 600;
+}
+.bb-brand-name { font-weight: 800; font-size: 13.5px; line-height: 1.25; }
+.bb-brand-count { font-size: 11.5px; color: var(--bb-muted); }
+
+/* ---------- Latest blog ---------- */
+.bb-blog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+.bb-blog-card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 22px;
+    background: #fff;
+    border: 2px solid #f6e7dc;
+    box-shadow: 0 5px 0 #f6e7dc;
+    color: inherit;
+    text-decoration: none;
+    transition: transform .25s cubic-bezier(.34, 1.56, .64, 1);
+}
+.bb-blog-card:hover { transform: translateY(-4px); }
+.bb-blog-media { position: relative; display: block; aspect-ratio: 16 / 10; background: var(--bb-peach); }
+.bb-blog-body { display: flex; flex-direction: column; gap: 5px; padding: 13px 15px 16px; }
+.bb-blog-meta { font-size: 11.5px; font-weight: 700; color: var(--bb-purple-deep); }
+.bb-blog-title { font-family: var(--bb-font-display); font-size: 16.5px; font-weight: 600; line-height: 1.3; }
+.bb-blog-excerpt { font-size: 13px; line-height: 1.5; color: var(--bb-muted); }

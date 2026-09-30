@@ -13,8 +13,8 @@ class ReportController extends Controller
 {
     protected function ensureAdmin(): void
     {
-        if (! Auth::user()?->isAdminUser()) {
-            abort(403, 'Reports are only available to shop admins.');
+        if (! Auth::user()?->can('view reports')) {
+            abort(403, 'You do not have permission to view reports.');
         }
     }
 

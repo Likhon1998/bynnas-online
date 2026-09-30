@@ -4,7 +4,7 @@
     $shareUrl = fn (string $source) => $shareBase.'?'.http_build_query([
         'utm_source' => $source,
         'utm_medium' => 'social_share',
-        'utm_campaign' => 'product_share',
+        'utm_campaign' => \App\Services\CampaignAttributionService::PRODUCT_SHARE,
         'utm_content' => $product->slug,
     ]);
     $shareTitle = $product->storefrontDisplayName();

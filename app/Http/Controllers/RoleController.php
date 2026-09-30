@@ -2,74 +2,85 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\StaffPermissions;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
 
 class RoleController extends Controller
 {
-    // Shows the list of all roles and their permissions
+    /** Roles that cannot be edited from the admin to avoid locking the shop out. */
+    private const LOCKED = ['Shop Owner', 'Customer'];
+
+    /** Role names referenced in code; their permissions can change but not their names. */
+    private const SYSTEM = ['Admin', 'Manager', 'Cashier'];
+
     public function index()
     {
-        $roles = Role::with('permissions')->get();
-        return view('roles.index', compact('roles'));
+        $roles = Role::with('permissions')->where('guard_name', 'web')->get();
+        $visible = StaffPermissions::assignable()->pluck('name')->all();
+
+        return view('roles.index', compact('roles', 'visible'));
     }
 
-    // Shows the form to create a new role
     public function create()
     {
-        $permissions = Permission::all();
+        $permissions = StaffPermissions::assignable();
+
         return view('roles.create', compact('permissions'));
     }
 
-    // Saves the new role to the database
     public function store(Request $request)
     {
-        $request->validate([
-            'name' => 'required|unique:roles,name',
-            'permissions' => 'required|array'
-        ]);
+        $data = $this->validated($request);
 
-        $role = Role::create(['name' => $request->name]);
-        $role->syncPermissions($request->permissions);
+        $role = Role::create(['name' => $data['name'], 'guard_name' => 'web']);
+        $role->syncPermissions($data['permissions']);
 
         return redirect()->route('roles.index')->with('success', 'Role created successfully!');
     }
 
-    // NEW: Shows the form to edit an existing role
     public function edit(Role $role)
     {
-        // Prevent editing the super Admin role to avoid locking yourself out
-        if ($role->name === 'Shop Owner') {
-            return redirect()->route('roles.index')->with('error', 'The Shop Owner role cannot be edited.');
+        if (in_array($role->name, self::LOCKED, true)) {
+            return redirect()->route('roles.index')->with('error', "The {$role->name} role cannot be edited.");
         }
 
-        $permissions = Permission::all();
-        // Get the names of the permissions this role already has
-        $rolePermissions = $role->permissions->pluck('name')->toArray(); 
+        $permissions = StaffPermissions::assignable();
+        $rolePermissions = $role->permissions->pluck('name')->toArray();
 
         return view('roles.edit', compact('role', 'permissions', 'rolePermissions'));
     }
 
-    // NEW: Saves the updated role to the database
     public function update(Request $request, Role $role)
     {
-        if ($role->name === 'Shop Owner') {
-            return redirect()->route('roles.index')->with('error', 'The Shop Owner role cannot be edited.');
+        if (in_array($role->name, self::LOCKED, true)) {
+            return redirect()->route('roles.index')->with('error', "The {$role->name} role cannot be edited.");
         }
 
-        $request->validate([
-            // Ensure name is unique, but ignore this exact role's current name
-            'name' => 'required|unique:roles,name,' . $role->id,
-            'permissions' => 'required|array'
-        ]);
+        $data = $this->validated($request, $role);
 
-        // Update the name
-        $role->update(['name' => $request->name]);
-        
-        // Sync updates the permissions (removes unchecked ones, adds checked ones)
-        $role->syncPermissions($request->permissions);
+        // Permissions hidden from the editor (retail module off) keep their current state.
+        $hidden = $role->permissions->pluck('name')
+            ->reject(fn ($name) => StaffPermissions::assignable()->pluck('name')->contains($name))
+            ->all();
+
+        if (! in_array($role->name, self::SYSTEM, true)) {
+            $role->update(['name' => $data['name']]);
+        }
+        $role->syncPermissions(array_values(array_unique(array_merge($data['permissions'], $hidden))));
 
         return redirect()->route('roles.index')->with('success', 'Role updated successfully!');
+    }
+
+    private function validated(Request $request, ?Role $role = null): array
+    {
+        $assignable = StaffPermissions::assignable()->pluck('name')->all();
+
+        return $request->validate([
+            'name' => ['required', 'string', 'max:60', Rule::unique('roles', 'name')->ignore($role?->id)],
+            'permissions' => ['required', 'array', 'min:1'],
+            'permissions.*' => ['string', Rule::in($assignable)],
+        ]);
     }
 }

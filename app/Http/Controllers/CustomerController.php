@@ -17,7 +17,7 @@ class CustomerController extends Controller
         $user = Auth::user();
         $shopId = $user->shop_id;
 
-        $query = $this->segments->withStats(Customer::where('shop_id', $shopId))->withCount('orders');
+        $query = $this->segments->withStats(Customer::where('shop_id', $shopId));
 
         // Cashiers: only customers who purchased at their counter
         if (! $user->isAdminUser() && $user->counter_id) {
@@ -60,12 +60,23 @@ class CustomerController extends Controller
             ? $customer->leads()->latest('id')->limit(20)->get()
             : collect();
 
+        $carts = $user->can('manage leads')
+            ? \App\Models\AbandonedCart::forShop((int) $customer->shop_id)
+                ->where('item_count', '>', 0)
+                ->where(fn ($q) => $q->where('customer_id', $customer->id)
+                    ->when($customer->user_id, fn ($q) => $q->orWhere('user_id', $customer->user_id)))
+                ->latest('last_activity_at')
+                ->limit(10)
+                ->get()
+            : collect();
+
         return view('customers.show', [
             'customer' => $customer,
             'stats' => $stats,
             'segments' => $segments,
             'orders' => $orders,
             'leads' => $leads,
+            'carts' => $carts,
             'statusLabels' => OrderStatus::labels(),
         ]);
     }
@@ -83,6 +94,7 @@ class CustomerController extends Controller
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:1000',
         ]);
+        $this->ensureUniquePhone($request->phone);
 
         Customer::create([
             'shop_id' => Auth::user()->shop_id,
@@ -98,13 +110,13 @@ class CustomerController extends Controller
 
     public function edit(Customer $customer)
     {
-        if ($customer->shop_id !== Auth::user()->shop_id) abort(403);
+        $this->authorizeCustomer($customer);
         return view('customers.edit', compact('customer'));
     }
 
     public function update(Request $request, Customer $customer)
     {
-        if ($customer->shop_id !== Auth::user()->shop_id) abort(403);
+        $this->authorizeCustomer($customer);
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -113,6 +125,7 @@ class CustomerController extends Controller
             'address' => 'nullable|string|max:1000',
             'reward_points' => 'required|integer|min:0',
         ]);
+        $this->ensureUniquePhone($request->phone, $customer);
 
         $customer->update([
             'name' => $request->name,
@@ -127,8 +140,38 @@ class CustomerController extends Controller
 
     public function destroy(Customer $customer)
     {
-        if ($customer->shop_id !== Auth::user()->shop_id) abort(403);
+        $this->authorizeCustomer($customer);
+
+        // Orders keep history via nullOnDelete, but baki/EMI rows cascade, so never delete customers with history.
+        if ($customer->user_id || $customer->orders()->exists() || $customer->bakiEntries()->exists() || $customer->emiPlans()->exists()) {
+            return redirect()->route('customers.show', $customer)
+                ->with('error', 'This customer has an account or order history and cannot be deleted.');
+        }
+
         $customer->delete();
         return redirect()->route('customers.index')->with('success', 'Customer deleted successfully!');
+    }
+
+    private function authorizeCustomer(Customer $customer): void
+    {
+        abort_unless((int) $customer->shop_id === (int) Auth::user()->shop_id, 404);
+    }
+
+    private function ensureUniquePhone(?string $phone, ?Customer $ignore = null): void
+    {
+        if (! $phone) {
+            return;
+        }
+
+        $exists = Customer::where('shop_id', Auth::user()->shop_id)
+            ->wherePhone($phone)
+            ->when($ignore, fn ($q) => $q->whereKeyNot($ignore->id))
+            ->exists();
+
+        if ($exists) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'phone' => 'Another customer already uses this phone number.',
+            ]);
+        }
     }
 }

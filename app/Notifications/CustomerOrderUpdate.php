@@ -43,9 +43,10 @@ class CustomerOrderUpdate extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $order = $this->order;
+        $settings = app(\App\Services\WebsiteService::class)->settings();
         $mail = (new MailMessage)
-            ->subject(self::EVENTS[$this->event].' · '.$order->invoice_no)
-            ->greeting('Hello '.($order->customer?->name ?: 'there').',')
+            ->subject(self::EVENTS[$this->event].' · '.$order->invoice_no.' · '.$settings->store_name)
+            ->greeting('Hello '.($order->delivery_name ?: $order->customer?->name ?: 'there').',')
             ->line($this->message());
 
         if ($this->event === OrderStatus::SHIPPED && $order->shipping_tracking_no) {
@@ -53,8 +54,9 @@ class CustomerOrderUpdate extends Notification
         }
 
         return $mail
-            ->line('Order total: Tk '.number_format((float) $order->total_amount, 0))
-            ->action('Track your order', route('website.track', ['invoice' => $order->invoice_no]));
+            ->line('Order total: '.$settings->currency_symbol.number_format((float) $order->total_amount, 0))
+            ->action('Track your order', route('website.track', ['invoice' => $order->invoice_no]))
+            ->salutation('Thanks, '.$settings->store_name);
     }
 
     public function toArray(object $notifiable): array

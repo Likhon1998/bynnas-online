@@ -6,8 +6,8 @@
             @csrf
 
             <div class="mb-6">
-                <label class="block text-sm font-bold text-gray-700 mb-2">Role Name (e.g. Senior Cashier)</label>
-                <input type="text" name="name" required placeholder="Enter role name..." class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 font-medium">
+                <label class="block text-sm font-bold text-gray-700 mb-2">Role Name (e.g. Order Handler)</label>
+                <input type="text" name="name" value="{{ old('name') }}" required maxlength="60" placeholder="Enter role name..." class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 font-medium">
                 @error('name')
                     <p class="text-red-500 text-xs font-bold mt-1">{{ $message }}</p>
                 @enderror
@@ -19,8 +19,8 @@
                     
                     @foreach($permissions as $permission)
                         <label class="inline-flex items-center p-3 bg-white border border-gray-200 rounded-lg cursor-pointer hover:border-indigo-500 transition-colors shadow-sm">
-                            <input type="checkbox" name="permissions[]" value="{{ $permission->name }}" class="rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 w-5 h-5 cursor-pointer">
-                            <span class="ml-3 text-sm font-bold text-gray-700 capitalize">{{ str_replace('_', ' ', $permission->name) }}</span>
+                            <input type="checkbox" name="permissions[]" value="{{ $permission->name }}" @checked(in_array($permission->name, old('permissions', []), true)) class="rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 w-5 h-5 cursor-pointer">
+                            <span class="ml-3 text-sm font-bold text-gray-700">{{ \App\Support\StaffPermissions::label($permission->name) }}</span>
                         </label>
                     @endforeach
 

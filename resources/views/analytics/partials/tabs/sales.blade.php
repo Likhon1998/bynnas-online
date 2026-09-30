@@ -125,7 +125,7 @@
     <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
         <div>
             <h3 class="font-bold text-gray-900">Sales by Brand</h3>
-            <p class="text-xs text-gray-500">Units &amp; revenue — POS and website completed orders</p>
+            <p class="text-xs text-gray-500">Units &amp; revenue — {{ retail_enabled() ? 'POS and website' : 'website' }} completed orders</p>
         </div>
         <a href="{{ route('reports.daily_by_brand', request()->only(['start_date', 'end_date', 'all_time', 'today'])) }}"
            class="text-xs font-bold text-cyan-700 hover:text-cyan-600">Full daily report →</a>
@@ -139,8 +139,10 @@
                     <th class="px-5 py-3 text-right">Purchase Cost</th>
                     <th class="px-5 py-3 text-right">Selling Amount</th>
                     <th class="px-5 py-3 text-right">Profit</th>
+                    @if(retail_enabled())
                     <th class="px-5 py-3 text-right">POS</th>
                     <th class="px-5 py-3 text-right">Website</th>
+                    @endif
                     <th class="px-5 py-3 text-right">Share</th>
                 </tr>
             </thead>
@@ -152,12 +154,14 @@
                         <td class="px-5 py-3 text-right font-semibold text-amber-700">৳{{ number_format($row->cost) }}</td>
                         <td class="px-5 py-3 text-right font-bold text-indigo-600">{{ format_taka($row->revenue) }}</td>
                         <td class="px-5 py-3 text-right font-bold {{ ($row->profit ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">{{ format_taka($row->profit ?? 0) }}</td>
+                        @if(retail_enabled())
                         <td class="px-5 py-3 text-right text-gray-600">{{ format_taka($row->pos_revenue) }}</td>
                         <td class="px-5 py-3 text-right text-gray-600">{{ format_taka($row->web_revenue) }}</td>
+                        @endif
                         <td class="px-5 py-3 text-right text-gray-500">{{ number_format(($row->revenue / $brandTotal) * 100, 0) }}%</td>
                     </tr>
                 @empty
-                    <tr><td colspan="8" class="px-5 py-8 text-center text-gray-400">No brand sales in this period.</td></tr>
+                    <tr><td colspan="{{ retail_enabled() ? 8 : 6 }}" class="px-5 py-8 text-center text-gray-400">No brand sales in this period.</td></tr>
                 @endforelse
             </tbody>
         </table>

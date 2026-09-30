@@ -5,7 +5,7 @@
     $discount = $product->discountPercent();
     $img = $ws->productImageUrl($product);
     $displayName = $product->storefrontDisplayName();
-    $catLabel = strtoupper($product->category?->name ?? $product->brand_name ?? 'Products');
+    $catLabel = strtoupper($product->category?->name ?? $product->brand_name ?? '');
     $rank = (int) ($trendingRank ?? 1);
     $rating = (float) ($product->rating ?? 0);
     $reviews = (int) ($product->review_count ?? 0);
@@ -46,17 +46,15 @@
         <p class="tn-trending-cat">{{ $catLabel }}</p>
         <a href="{{ route('website.product', $product) }}" class="tn-trending-name">{{ $displayName }}</a>
 
+        @if($reviews > 0)
         <div class="tn-trending-rating" aria-label="Rating {{ number_format($rating, 1) }}">
             @for($i = 1; $i <= 5; $i++)
                 <span class="tn-trending-star {{ $i > round($rating) ? 'is-empty' : '' }}">★</span>
             @endfor
-            @if($rating > 0)
-                <strong>{{ number_format($rating, 1) }}</strong>
-            @endif
-            @if($reviews > 0)
-                <span>({{ $reviewLabel }})</span>
-            @endif
+            <strong>{{ number_format($rating, 1) }}</strong>
+            <span>({{ $reviewLabel }})</span>
         </div>
+        @endif
 
         <div class="tn-trending-foot">
             <div class="tn-trending-prices">

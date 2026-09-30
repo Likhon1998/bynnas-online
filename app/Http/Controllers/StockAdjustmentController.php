@@ -113,6 +113,6 @@ class StockAdjustmentController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('supply.adjustments.index')->with('success', 'Stock adjustment saved and synced to POS, web store, and accounts.');
+        return redirect()->route('supply.adjustments.index')->with('success', retail_enabled() ? 'Stock adjustment saved and synced to POS, web store, and accounts.' : 'Stock adjustment saved and synced to the web store and accounts.');
     }
 }

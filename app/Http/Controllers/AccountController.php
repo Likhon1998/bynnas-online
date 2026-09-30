@@ -16,8 +16,8 @@ class AccountController extends Controller
 
     protected function ensureAdmin(): void
     {
-        if (! Auth::user()?->isAdminUser()) {
-            abort(403, 'Accounts are only available to shop admins.');
+        if (! Auth::user()?->can('manage accounts')) {
+            abort(403, 'You do not have permission to manage accounts.');
         }
     }
 
@@ -35,16 +35,24 @@ class AccountController extends Controller
     {
         $shopId = $this->bootstrap();
         [$start, $end] = $this->accounts->dateRange($request);
-        $counters = Counter::where('shop_id', $shopId)->get();
+        $retail = retail_enabled();
+        $counters = $retail ? Counter::where('shop_id', $shopId)->get() : collect();
 
         $allAccountModels = Account::where('shop_id', $shopId)
             ->with('counter')
             ->orderBy('type')
             ->orderBy('name')
             ->get();
+        $balances = $this->accounts->accountBalances($allAccountModels);
+
+        // Retail-only accounts stay hidden while the module is off, unless they still hold a balance.
+        if (! $retail) {
+            $allAccountModels = $allAccountModels->reject(fn (Account $a) => ($a->counter_id || in_array($a->code, ['BAKI-AR', 'EMI-AR'], true))
+                && abs((float) ($balances[$a->id] ?? 0)) < 0.01
+                && abs((float) $a->opening_balance) < 0.01)->values();
+        }
 
         $activeAccountModels = $allAccountModels->where('is_active', true)->values();
-        $balances = $this->accounts->accountBalances($allAccountModels);
 
         $accounts = $activeAccountModels->map(fn (Account $a) => [
             'account' => $a,
@@ -101,6 +109,9 @@ class AccountController extends Controller
         }
 
         $cashAccounts = $this->accounts->cashAccounts($shopId);
+        if (! $retail) {
+            $cashAccounts = $cashAccounts->whereIn('id', $allAccountModels->pluck('id'))->values();
+        }
         $cashAccountId = $activeTab === 'cash-book' ? $request->get('account_id') : null;
         $counterId = $activeTab === 'cash-book' ? $request->get('counter_id') : null;
 
@@ -160,6 +171,7 @@ class AccountController extends Controller
             'summaryCounterId',
             'pettyBalance',
             'transferAccounts',
+            'retail',
         ));
     }
 
@@ -229,6 +241,10 @@ class AccountController extends Controller
 
     public function dailySummary(Request $request)
     {
+        if (! retail_enabled()) {
+            return redirect()->route('accounts.opening-balance');
+        }
+
         return $this->accountView($request, 'daily-summary');
     }
 

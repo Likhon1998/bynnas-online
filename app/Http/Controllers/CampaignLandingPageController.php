@@ -138,9 +138,11 @@ class CampaignLandingPageController extends Controller
             'customer_address' => 'required|string|min:5|max:1000',
             'delivery_zone' => ['nullable', 'string', Rule::in($this->delivery->zoneCodes((int) $page->shop_id))],
             'payment_method' => ['nullable', 'string', Rule::in($this->delivery->allowedPaymentMethods())],
+            'payment_reference' => 'nullable|required_if:payment_method,confirmation_charge|string|min:4|max:100',
             'note' => 'nullable|string|max:500',
             'website' => 'nullable|size:0',
         ], [
+            'payment_reference.required_if' => 'Enter the Transaction ID of your confirmation payment.',
             'customer_phone.regex' => 'Enter a valid phone number.',
             'customer_address.required' => 'Delivery address is required.',
             'website.size' => 'Please try again.',
@@ -171,6 +173,7 @@ class CampaignLandingPageController extends Controller
             ], [['id' => $data['product_id'], 'qty' => $data['qty']]], $user?->isStorefrontCustomer() ? $user : null, [
                 'zone' => $data['delivery_zone'] ?? null,
                 'payment_method' => $data['payment_method'] ?? null,
+                'payment_reference' => $data['payment_reference'] ?? null,
                 'note' => $data['note'] ?? null,
                 'attribution' => $attribution,
                 'landing_page_id' => $page->id,

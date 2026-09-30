@@ -73,10 +73,27 @@ class DeliverySettingsController extends Controller
             'default_zone' => 'nullable|string|max:40',
             'delivery_free_min_amount' => 'required|numeric|min:0|max:99999999',
             'delivery_confirmation_amount' => 'nullable|numeric|min:0|max:999999',
+            'delivery_confirmation_instructions' => 'nullable|string|max:1000',
         ], [
             'zones.*.name.required' => 'Every delivery zone needs a name.',
             'zones.*.code.regex' => 'Zone codes may only contain lowercase letters, numbers and underscores.',
         ]);
+
+        if ($request->boolean('delivery_confirmation_enabled') && blank($data['delivery_confirmation_instructions'] ?? null)) {
+            throw ValidationException::withMessages([
+                'delivery_confirmation_instructions' => 'Add payment instructions (e.g. your bKash/Nagad number) so customers know where to send the confirmation charge.',
+            ]);
+        }
+        if ($request->boolean('delivery_confirmation_enabled') && (float) ($data['delivery_confirmation_amount'] ?? 0) <= 0) {
+            throw ValidationException::withMessages([
+                'delivery_confirmation_amount' => 'Set a confirmation charge above 0, or turn the confirmation charge off.',
+            ]);
+        }
+        if (! $request->boolean('delivery_cod_enabled') && ! $request->boolean('delivery_confirmation_enabled')) {
+            throw ValidationException::withMessages([
+                'delivery_cod_enabled' => 'Keep at least one payment method on (cash on delivery or confirmation charge).',
+            ]);
+        }
 
         $rows = collect($data['zones'])
             ->reject(fn ($row) => ! empty($row['delete']))
@@ -149,6 +166,9 @@ class DeliverySettingsController extends Controller
                 'delivery_cod_enabled' => $request->boolean('delivery_cod_enabled'),
                 'delivery_confirmation_enabled' => $request->boolean('delivery_confirmation_enabled'),
                 'delivery_confirmation_amount' => round((float) ($data['delivery_confirmation_amount'] ?? 0), 2),
+                'delivery_confirmation_instructions' => filled($data['delivery_confirmation_instructions'] ?? null)
+                    ? trim($data['delivery_confirmation_instructions'])
+                    : null,
             ]);
             $settings->save();
         });

@@ -100,7 +100,8 @@
             <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                 <div class="border-b border-slate-100 px-5 py-4">
                     <h2 class="text-sm font-bold text-slate-900">Payment options</h2>
-                    <p class="mt-0.5 text-xs text-slate-500">Enable COD and/or a confirmation (advance) charge. At least one should stay on.</p>
+                    <p class="mt-0.5 text-xs text-slate-500">Enable COD and/or a confirmation (advance) charge. At least one must stay on.</p>
+                    <x-input-error class="mt-1" :messages="$errors->get('delivery_cod_enabled')" />
                 </div>
                 <div class="divide-y divide-slate-100">
                     <label class="flex items-start gap-3 p-5 cursor-pointer hover:bg-slate-50/80">
@@ -109,7 +110,7 @@
                                @checked(old('delivery_cod_enabled', $settings->delivery_cod_enabled ?? true))>
                         <span>
                             <span class="block text-sm font-bold text-slate-900">Cash on delivery (COD)</span>
-                            <span class="mt-0.5 block text-xs text-slate-500">Customer pays the full bill when the parcel arrives. Receipt shows COD DUE until you mark delivered.</span>
+                            <span class="mt-0.5 block text-xs text-slate-500">Customer pays the full bill when the parcel arrives. Invoice shows COD DUE until you mark delivered.</span>
                         </span>
                     </label>
 
@@ -129,6 +130,14 @@
                                    value="{{ old('delivery_confirmation_amount', $settings->delivery_confirmation_amount ?? 0) }}"
                                    class="mt-1.5 w-full rounded-xl border-slate-200 text-sm">
                             <x-input-error class="mt-1" :messages="$errors->get('delivery_confirmation_amount')" />
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold uppercase tracking-wide text-slate-500">How to pay (shown at checkout)</label>
+                            <textarea name="delivery_confirmation_instructions" rows="3" maxlength="1000"
+                                      class="mt-1.5 w-full rounded-xl border-slate-200 text-sm"
+                                      placeholder="Send Money to bKash 01XXXXXXXXX (Personal) or Nagad 01XXXXXXXXX, then enter the Transaction ID below.">{{ old('delivery_confirmation_instructions', $settings->delivery_confirmation_instructions) }}</textarea>
+                            <p class="mt-1 text-[11px] text-slate-500">Customers must enter the Transaction ID to place the order. You'll see it on the order page to check against your bKash/Nagad statement before confirming.</p>
+                            <x-input-error class="mt-1" :messages="$errors->get('delivery_confirmation_instructions')" />
                         </div>
                     </div>
                 </div>

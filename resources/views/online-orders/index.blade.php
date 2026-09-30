@@ -193,7 +193,7 @@
                                             <button type="button"
                                                     @click="window.open(order.receipt_url, 'ReceiptWindow', 'width=400,height=620')"
                                                     class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
-                                                Print receipt
+                                                Print invoice
                                             </button>
                                         </div>
                                     </td>
@@ -201,7 +201,16 @@
                             </template>
                             <tr x-show="filteredOrders.length === 0">
                                 <td colspan="5" class="px-4 py-20 text-center align-middle">
-                                    <p class="text-gray-500 font-medium">No online orders match your search.</p>
+                                    <template x-if="allOrders.length === 0">
+                                        <div>
+                                            <p class="text-gray-700 font-bold">No online orders yet</p>
+                                            <p class="mt-1 text-sm text-gray-500">Orders placed on the website, landing pages or from leads will appear here.</p>
+                                            <a href="{{ route('home') }}" target="_blank" class="mt-3 inline-flex text-xs font-bold text-indigo-600 hover:underline">Open the storefront →</a>
+                                        </div>
+                                    </template>
+                                    <template x-if="allOrders.length > 0">
+                                        <p class="text-gray-500 font-medium">No online orders match your search or filters.</p>
+                                    </template>
                                 </td>
                             </tr>
                         </tbody>

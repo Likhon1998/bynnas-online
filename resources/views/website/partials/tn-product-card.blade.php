@@ -5,7 +5,7 @@
     $compareAt = $product->compareAtPrice();
     $img = $ws->productImageUrl($product);
     $displayName = $product->storefrontDisplayName();
-    $catLabel = $product->category?->name ?? $product->brand_name ?? 'Electronics';
+    $catLabel = $product->category?->name ?? $product->brand_name ?? '';
     $flash = !empty($flash);
     $isNew = $product->showsAsNew();
     $isCombo = (bool) $product->is_combo;
@@ -75,11 +75,11 @@
         </div>
 
         <div class="tn-product-foot">
-            <div class="tn-product-stars" aria-label="Rating {{ number_format($rating, 1) }}">
-                @for($i = 1; $i <= 5; $i++)
-                    <span class="tn-product-star {{ $i > round($rating) ? 'empty' : '' }}">★</span>
-                @endfor
+            <div class="tn-product-stars" @if($reviews > 0) aria-label="Rating {{ number_format($rating, 1) }}" @endif>
                 @if($reviews > 0)
+                    @for($i = 1; $i <= 5; $i++)
+                        <span class="tn-product-star {{ $i > round($rating) ? 'empty' : '' }}">★</span>
+                    @endfor
                     <span class="tn-product-reviews">({{ number_format($reviews) }})</span>
                 @else
                     <span class="tn-product-reviews tn-product-reviews--empty">&nbsp;</span>

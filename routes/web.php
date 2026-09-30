@@ -54,7 +54,7 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Nexa POS Web Routes
+| Web Routes: storefront (public) + staff admin (auth:admin)
 |--------------------------------------------------------------------------
 */
 
@@ -62,6 +62,8 @@ Route::get('/', [WebsiteController::class, 'home'])->name('home');
 Route::get('/favicon.ico', function () {
     return redirect()->to(site_favicon_url(), 302);
 })->name('favicon');
+Route::get('/robots.txt', [\App\Http\Controllers\SeoController::class, 'robots'])->name('robots');
+Route::get('/sitemap.xml', [\App\Http\Controllers\SeoController::class, 'sitemap'])->name('sitemap');
 /*
 | Customer auth entry — storefront uses a modal, so /login opens home + sign-in.
 | Staff login lives at /admin/login (route: admin.login). Never collide names.
@@ -80,6 +82,8 @@ Route::get('/go/{code}', [CampaignController::class, 'go'])->where('code', '[A-Z
 Route::get('/campaign/{slug}', [CampaignLandingPageController::class, 'show'])->where('slug', '[A-Za-z0-9\-_]+')->name('website.landing');
 Route::post('/campaign/{slug}/order', [CampaignLandingPageController::class, 'order'])->where('slug', '[A-Za-z0-9\-_]+')
     ->middleware('throttle:10,1')->name('website.landing.order');
+Route::match(['get', 'post'], '/payment/callback/{transaction}', \App\Http\Controllers\PaymentCallbackController::class)
+    ->middleware('throttle:30,1')->name('payment.callback');
 Route::get('/track-order', [WebsiteController::class, 'trackOrder'])->name('website.track');
 Route::post('/track-order', [WebsiteController::class, 'trackOrderLookup'])->name('website.track.lookup');
 
@@ -101,6 +105,8 @@ Route::middleware('auth:web')->group(function () {
     Route::get('/account/profile', [StorefrontAuthController::class, 'editProfile'])->name('website.account.profile.edit');
     Route::put('/account/profile', [StorefrontAuthController::class, 'updateProfile'])->name('website.account.profile.update');
     Route::delete('/account/profile', [StorefrontAuthController::class, 'destroyAccount'])->name('website.account.profile.destroy');
+    Route::post('/account/notifications/read-all', [StorefrontAuthController::class, 'readAllNotifications'])->name('website.account.notifications.read-all');
+    Route::post('/account/notifications/{id}/read', [StorefrontAuthController::class, 'readNotification'])->name('website.account.notifications.read');
     Route::post('/checkout', [WebsiteController::class, 'checkout'])->name('website.checkout');
 });
 Route::get('/page/{slug}', [WebsiteController::class, 'page'])->name('website.page');
@@ -123,7 +129,7 @@ Route::middleware([
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/refresh-session', function () {
         return response()->json([
-            'status' => 'Nexa POS Active',
+            'status' => 'active',
             'csrf_token' => csrf_token(),
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     })->name('session.refresh');
@@ -206,7 +212,7 @@ Route::middleware([
         Route::post('/counter-sessions/{session}/close', [CounterSessionController::class, 'close'])->name('counters.sessions.close');
     });
 
-    Route::resource('customers', CustomerController::class);
+    Route::resource('customers', CustomerController::class)->middleware('can:manage customers');
 
     Route::middleware('can:manage campaigns')->group(function () {
         Route::resource('campaigns', CampaignController::class);
@@ -273,7 +279,7 @@ Route::middleware([
         Route::post('/purchase-returns', [PurchaseReturnController::class, 'store'])->name('purchase-returns.store');
     });
 
-    Route::prefix('accounts')->name('accounts.')->group(function () {
+    Route::prefix('accounts')->name('accounts.')->middleware('can:manage accounts')->group(function () {
         Route::get('/opening-balance', [AccountController::class, 'openingBalance'])->name('opening-balance');
         Route::post('/opening-balance', [AccountController::class, 'updateOpeningBalance'])->name('opening-balance.update');
         Route::get('/chart', [AccountController::class, 'chart'])->name('chart');
@@ -287,7 +293,7 @@ Route::middleware([
         Route::post('/transfer', [AccountController::class, 'transferStore'])->name('transfer.store');
     });
 
-    Route::prefix('analytics')->name('analytics.')->group(function () {
+    Route::prefix('analytics')->name('analytics.')->middleware('can:view reports')->group(function () {
         Route::get('/overview', [AnalyticsController::class, 'overview'])->name('overview');
         Route::get('/orders', [AnalyticsController::class, 'orders'])->name('orders');
         Route::get('/products', [AnalyticsController::class, 'products'])->name('products');
@@ -304,9 +310,11 @@ Route::middleware([
         Route::get('/balance', [AnalyticsController::class, 'balance'])->name('balance');
     });
 
-    Route::get('/reports/daily-sales', [ReportController::class, 'dailySales'])->name('reports.daily');
-    Route::get('/reports/daily-sales-by-brand', [ReportController::class, 'dailySalesByBrand'])->name('reports.daily_by_brand');
-    Route::get('/reports/best-sellers', [ReportController::class, 'bestSellers'])->name('reports.best_sellers');
+    Route::middleware('can:view reports')->group(function () {
+        Route::get('/reports/daily-sales', [ReportController::class, 'dailySales'])->name('reports.daily');
+        Route::get('/reports/daily-sales-by-brand', [ReportController::class, 'dailySalesByBrand'])->name('reports.daily_by_brand');
+        Route::get('/reports/best-sellers', [ReportController::class, 'bestSellers'])->name('reports.best_sellers');
+    });
     Route::get('/reports/low-stock', [ReportController::class, 'lowStock'])
         ->middleware('can:manage inventory')
         ->name('reports.low_stock');
@@ -329,14 +337,16 @@ Route::middleware([
         Route::post('/staff/{staff}/toggle-suspend', [StaffController::class, 'toggleSuspend'])->name('staff.toggle-suspend');
     });
 
-    Route::get('/online-orders', [OnlineOrderController::class, 'index'])->name('online-orders.index');
-    Route::get('/online-orders/notifications', [OnlineOrderController::class, 'notifications'])->name('online-orders.notifications');
-    Route::post('/online-orders/notifications/seen', [OnlineOrderController::class, 'markNotificationsSeen'])->name('online-orders.notifications.seen');
-    Route::get('/online-orders/{order}', [OnlineOrderController::class, 'show'])->name('online-orders.show');
-    Route::post('/online-orders/{order}/status', [OnlineOrderController::class, 'updateStatus'])->name('online-orders.update-status');
-    Route::post('/online-orders/{order}/verify', [OnlineOrderController::class, 'verify'])->name('online-orders.verify');
-    Route::post('/online-orders/{order}/cancel', [OrderCancellationController::class, 'cancel'])->name('online-orders.cancel');
-    Route::post('/online-orders/{order}/collect-from-courier', [OnlineOrderController::class, 'collectFromCourier'])->name('online-orders.collect-from-courier');
+    Route::middleware('can:manage orders')->group(function () {
+        Route::get('/online-orders', [OnlineOrderController::class, 'index'])->name('online-orders.index');
+        Route::get('/online-orders/notifications', [OnlineOrderController::class, 'notifications'])->name('online-orders.notifications');
+        Route::post('/online-orders/notifications/seen', [OnlineOrderController::class, 'markNotificationsSeen'])->name('online-orders.notifications.seen');
+        Route::get('/online-orders/{order}', [OnlineOrderController::class, 'show'])->name('online-orders.show');
+        Route::post('/online-orders/{order}/status', [OnlineOrderController::class, 'updateStatus'])->name('online-orders.update-status');
+        Route::post('/online-orders/{order}/verify', [OnlineOrderController::class, 'verify'])->name('online-orders.verify');
+        Route::post('/online-orders/{order}/cancel', [OrderCancellationController::class, 'cancel'])->name('online-orders.cancel');
+        Route::post('/online-orders/{order}/collect-from-courier', [OnlineOrderController::class, 'collectFromCourier'])->name('online-orders.collect-from-courier');
+    });
 
     Route::middleware('can:manage leads')->group(function () {
         Route::resource('leads', \App\Http\Controllers\LeadController::class);

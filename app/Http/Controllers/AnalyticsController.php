@@ -15,8 +15,8 @@ class AnalyticsController extends Controller
 
     protected function ensureAdmin(): void
     {
-        if (! Auth::user()?->isAdminUser()) {
-            abort(403, 'Reports are only available to shop admins.');
+        if (! Auth::user()?->can('view reports')) {
+            abort(403, 'You do not have permission to view reports.');
         }
     }
 
@@ -269,17 +269,19 @@ class AnalyticsController extends Controller
         }
 
         $rows[] = [];
-        $rows[] = ['Brand', 'Units', 'Purchase Cost', 'Selling Amount', 'Profit', 'POS Revenue', 'Web Revenue'];
+        $retail = retail_enabled();
+        $rows[] = array_merge(['Brand', 'Units', 'Purchase Cost', 'Selling Amount', 'Profit'], $retail ? ['POS Revenue', 'Web Revenue'] : []);
         foreach ($this->analytics->salesByBrand($shopId, $start, $end, 50) as $brand) {
-            $rows[] = [
+            $rows[] = array_merge([
                 $brand->brand,
                 $brand->sold,
                 number_format((float) $brand->cost, 2, '.', ''),
                 number_format((float) $brand->revenue, 2, '.', ''),
                 number_format((float) $brand->profit, 2, '.', ''),
+            ], $retail ? [
                 number_format((float) $brand->pos_revenue, 2, '.', ''),
                 number_format((float) $brand->web_revenue, 2, '.', ''),
-            ];
+            ] : []);
         }
 
         return $rows;
@@ -299,8 +301,8 @@ class AnalyticsController extends Controller
                 $rows[] = [
                     $order->invoice_no,
                     $order->created_at->format('Y-m-d H:i'),
-                    $order->customer?->name ?? 'Walk-in',
-                    $order->counter_id ? 'POS' : 'Online',
+                    $order->delivery_name ?: ($order->customer?->name ?? 'Guest'),
+                    $order->counter_id ? (retail_enabled() ? 'POS' : 'In-store (legacy)') : 'Online',
                     $order->payment_method,
                     $order->status,
                     number_format((float) $order->total_amount, 2, '.', ''),
@@ -345,7 +347,7 @@ class AnalyticsController extends Controller
 
     protected function exportStock(int $shopId): array
     {
-        $rows = [['SKU / Name', 'Category', 'Stock', 'Alert Qty', 'Cost Value', 'Retail Value', 'Status']];
+        $rows = [['SKU / Name', 'Category', 'Stock', 'Alert Qty', 'Cost Value', 'Selling Value', 'Status']];
 
         Product::where('shop_id', $shopId)
             ->with('category')
@@ -395,7 +397,7 @@ class AnalyticsController extends Controller
                 $rows[] = [
                     $order->invoice_no,
                     $order->created_at->format('Y-m-d H:i'),
-                    $order->customer?->name ?? 'Walk-in',
+                    $order->delivery_name ?: ($order->customer?->name ?? 'Guest'),
                     number_format((float) $order->total_amount, 2, '.', ''),
                     number_format((float) $order->discount_amount, 2, '.', ''),
                     number_format($order->netPayable(), 2, '.', ''),

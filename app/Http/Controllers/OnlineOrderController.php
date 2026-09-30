@@ -21,15 +21,15 @@ class OnlineOrderController extends Controller
 
     protected function ensureAdmin(): void
     {
-        if (! Auth::user()?->isAdminUser()) {
-            abort(403, 'Online orders are only available to shop admins.');
+        if (! Auth::user()?->can('manage orders')) {
+            abort(403, 'You do not have permission to manage orders.');
         }
     }
 
     protected function authorizeOrder(Order $order): void
     {
         $this->ensureAdmin();
-        if ($order->shop_id !== Auth::user()->shop_id || ! $order->isOnlineOrder()) {
+        if ((int) $order->shop_id !== (int) Auth::user()->shop_id || ! $order->isOnlineOrder()) {
             abort(403, 'Unauthorized Access');
         }
     }
@@ -209,7 +209,7 @@ class OnlineOrderController extends Controller
             'items.product:id,name',
             'courierService:id,name,phone',
             'verifier:id,name',
-            'statusLogs' => fn ($q) => $q->latest('id')->limit(20),
+            'statusLogs' => fn ($q) => $q->with('changedBy:id,name')->latest('id')->limit(20),
         ]);
 
         $timeline = $this->tracking->customerTimeline($order);
@@ -221,6 +221,7 @@ class OnlineOrderController extends Controller
         )));
         $verificationMethods = OrderStatus::VERIFICATION_METHODS;
 
+        CourierService::ensureDefaults(Auth::user()->shop_id);
         $courierServices = CourierService::forShop(Auth::user()->shop_id)
             ->active()
             ->orderBy('sort_order')

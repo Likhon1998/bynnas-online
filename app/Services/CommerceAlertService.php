@@ -78,6 +78,7 @@ class CommerceAlertService
             $body,
             route('online-orders.show', $order),
             'order_'.$to.':'.$order->id,
+            'manage orders',
         ) > 0;
     }
 
@@ -110,6 +111,7 @@ class CommerceAlertService
                         ." and not delivered after {$days} days.",
                     route('online-orders.show', $order),
                     $ref,
+                    'manage orders',
                 );
                 $sent++;
             });

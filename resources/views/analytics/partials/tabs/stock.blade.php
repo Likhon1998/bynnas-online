@@ -9,7 +9,7 @@
             <p class="text-2xl font-black text-indigo-600 mt-2">{{ number_format($inventory['total_units']) }}</p>
         </div>
         <div class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-            <p class="text-[10px] font-bold text-gray-400 uppercase">Retail Value</p>
+            <p class="text-[10px] font-bold text-gray-400 uppercase">Selling Value</p>
             <p class="text-2xl font-black text-emerald-600 mt-2">{{ format_taka($inventory['retail_value']) }}</p>
         </div>
         <div class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">

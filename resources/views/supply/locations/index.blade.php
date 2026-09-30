@@ -5,7 +5,7 @@
 @endphp
 <x-supply-layout
     :title="$label . ' Settings'"
-    :subtitle="$isWarehouse ? 'Back-room storage — receive here, then transfer to store to sell.' : 'Your retail store — sellable stock for POS & web.'"
+    :subtitle="$isWarehouse ? 'Back-room storage — receive here, then transfer to store to sell.' : (retail_enabled() ? 'Your retail store — sellable stock for POS & web.' : 'Your store — sellable stock for the online shop.')"
     :action-url="$canAdd ? route($isWarehouse ? 'supply.warehouses.create' : 'supply.stores.create') : null"
     :action-label="$canAdd ? '+ Add ' . $label : null">
     @if (! $canAdd)

@@ -1,6 +1,6 @@
 <x-supply-layout
     title="Opening Inventory"
-    subtitle="One-time setup for new products. All stock lives in your single store — synced to POS and your online shop."
+    :subtitle="'One-time setup for new products. All stock lives in your single store — synced to ' . (retail_enabled() ? 'POS and ' : '') . 'your online shop.'"
     :action-url="route('products.create', ['from' => 'opening-inventory'])"
     action-label="+ Add Product"
 >

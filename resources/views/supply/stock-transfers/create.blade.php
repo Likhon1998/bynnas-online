@@ -94,7 +94,7 @@
             <div>
                 <h1 class="text-[22px] sm:text-[26px] font-extrabold tracking-tight text-slate-900">New Stock Transfer</h1>
                 <p class="mt-1 text-sm text-slate-500 max-w-2xl">
-                    Warehouse ↔ Store updates sellable stock. Warehouse ↔ Warehouse is warehouse-only (POS/web unchanged until transferred to a store).
+                    Warehouse ↔ Store updates sellable stock. Warehouse ↔ Warehouse is warehouse-only ({{ retail_enabled() ? 'POS/web' : 'online store' }} unchanged until transferred to a store).
                 </p>
             </div>
             <a href="{{ route('supply.stock-transfers.index') }}" class="st-btn-outline self-start shrink-0">
@@ -280,7 +280,7 @@
                                 </span>
                                 <div>
                                     <p class="text-xs font-extrabold text-emerald-900">Warehouse ↔ Store</p>
-                                    <p class="mt-0.5 text-[12px] text-emerald-800/80 leading-snug">Updates sellable stock for POS and the online store.</p>
+                                    <p class="mt-0.5 text-[12px] text-emerald-800/80 leading-snug">Updates sellable stock for {{ retail_enabled() ? 'POS and ' : '' }}the online store.</p>
                                 </div>
                             </div>
                             <div class="rounded-xl border border-violet-100 bg-violet-50/70 p-3.5 flex gap-3">
@@ -289,7 +289,7 @@
                                 </span>
                                 <div>
                                     <p class="text-xs font-extrabold text-violet-900">Warehouse ↔ Warehouse</p>
-                                    <p class="mt-0.5 text-[12px] text-violet-800/80 leading-snug">Moves held stock only — POS/web sellable qty stays the same.</p>
+                                    <p class="mt-0.5 text-[12px] text-violet-800/80 leading-snug">Moves held stock only — {{ retail_enabled() ? 'POS/web' : 'online' }} sellable qty stays the same.</p>
                                 </div>
                             </div>
                         </div>

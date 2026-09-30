@@ -2,6 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Palette variables for tailwind.config.js (slate / gray / indigo / blue).
+ * Stock Tailwind values everywhere; the admin panel swaps in the storefront theme.
+ */
+:root {
+    --c-slate-50: 248 250 252; --c-slate-100: 241 245 249; --c-slate-200: 226 232 240; --c-slate-300: 203 213 225;
+    --c-slate-400: 148 163 184; --c-slate-500: 100 116 139; --c-slate-600: 71 85 105; --c-slate-700: 51 65 85;
+    --c-slate-800: 30 41 59; --c-slate-900: 15 23 42; --c-slate-950: 2 6 23;
+
+    --c-gray-50: 249 250 251; --c-gray-100: 243 244 246; --c-gray-200: 229 231 235; --c-gray-300: 209 213 219;
+    --c-gray-400: 156 163 175; --c-gray-500: 107 114 128; --c-gray-600: 75 85 99; --c-gray-700: 55 65 81;
+    --c-gray-800: 31 41 55; --c-gray-900: 17 24 39; --c-gray-950: 3 7 18;
+
+    --c-indigo-50: 238 242 255; --c-indigo-100: 224 231 255; --c-indigo-200: 199 210 254; --c-indigo-300: 165 180 252;
+    --c-indigo-400: 129 140 248; --c-indigo-500: 99 102 241; --c-indigo-600: 79 70 229; --c-indigo-700: 67 56 202;
+    --c-indigo-800: 55 48 163; --c-indigo-900: 49 46 129; --c-indigo-950: 30 27 75;
+
+    --c-violet-50: 245 243 255; --c-violet-100: 237 233 254; --c-violet-200: 221 214 254; --c-violet-300: 196 181 253;
+    --c-violet-400: 167 139 250; --c-violet-500: 139 92 246; --c-violet-600: 124 58 237; --c-violet-700: 109 40 217;
+    --c-violet-800: 91 33 182; --c-violet-900: 76 29 149; --c-violet-950: 46 16 101;
+
+    --c-blue-50: 239 246 255; --c-blue-100: 219 234 254; --c-blue-200: 191 219 254; --c-blue-300: 147 197 253;
+    --c-blue-400: 96 165 250; --c-blue-500: 59 130 246; --c-blue-600: 37 99 235; --c-blue-700: 29 78 216;
+    --c-blue-800: 30 64 175; --c-blue-900: 30 58 138; --c-blue-950: 23 37 84;
+}
+
+/* Admin theme: warm neutrals, purple primary, coral accent (matches the storefront) */
+body.admin-panel {
+    --c-slate-50: 253 249 246; --c-slate-100: 248 241 235; --c-slate-200: 240 228 218; --c-slate-300: 226 208 195;
+    --c-slate-400: 118 97 90; --c-slate-500: 101 79 69; --c-slate-600: 84 66 58; --c-slate-700: 69 53 47;
+    --c-slate-800: 55 42 37; --c-slate-900: 42 31 26; --c-slate-950: 28 20 17;
+
+    --c-gray-50: 253 249 246; --c-gray-100: 248 241 235; --c-gray-200: 240 228 218; --c-gray-300: 226 208 195;
+    --c-gray-400: 118 97 90; --c-gray-500: 101 79 69; --c-gray-600: 84 66 58; --c-gray-700: 69 53 47;
+    --c-gray-800: 55 42 37; --c-gray-900: 42 31 26; --c-gray-950: 28 20 17;
+
+    --c-indigo-50: 247 243 254; --c-indigo-100: 239 233 252; --c-indigo-200: 221 209 248; --c-indigo-300: 196 178 241;
+    --c-indigo-400: 154 128 223; --c-indigo-500: 118 87 201; --c-indigo-600: 100 69 184; --c-indigo-700: 85 58 158;
+    --c-indigo-800: 70 48 128; --c-indigo-900: 58 40 104; --c-indigo-950: 36 23 68;
+
+    --c-violet-50: 247 243 254; --c-violet-100: 239 233 252; --c-violet-200: 221 209 248; --c-violet-300: 196 178 241;
+    --c-violet-400: 154 128 223; --c-violet-500: 118 87 201; --c-violet-600: 100 69 184; --c-violet-700: 85 58 158;
+    --c-violet-800: 70 48 128; --c-violet-900: 58 40 104; --c-violet-950: 36 23 68;
+
+    --c-blue-50: 255 245 240; --c-blue-100: 253 232 221; --c-blue-200: 251 210 191; --c-blue-300: 242 168 134;
+    --c-blue-400: 224 113 75; --c-blue-500: 201 90 52; --c-blue-600: 184 79 44; --c-blue-700: 158 66 37;
+    --c-blue-800: 131 55 31; --c-blue-900: 107 46 27; --c-blue-950: 61 23 12;
+
+    --bb-cream: #fffaf5;
+    --bb-coral: #ec8560;
+    --bb-coral-deep: #db6f4a;
+    --bb-purple: #8b6fd6;
+    --bb-purple-deep: #6a4bb8;
+    --bb-ink: #3a2a24;
+    --bb-line: #f2e6dc;
+}
+
 /* Admin panel: moderate / compact typography (POS + storefront keep their own layouts) */
 @layer base {
     body.admin-panel {
@@ -43,29 +100,29 @@
     body.admin-panel .bg-gray-900 .text-slate-500,
     body.admin-panel .bg-slate-900 .text-gray-500,
     body.admin-panel .bg-gray-900 .text-gray-500 {
-        color: #cbd5e1 !important; /* slate-300 */
+        color: rgb(var(--c-slate-300)) !important;
     }
 
     body.admin-panel .bg-slate-900 .text-slate-400,
     body.admin-panel .bg-gray-900 .text-slate-400,
     body.admin-panel .bg-slate-900 .text-gray-400,
     body.admin-panel .bg-gray-900 .text-gray-400 {
-        color: #e2e8f0 !important; /* slate-200 */
+        color: rgb(var(--c-slate-200)) !important;
     }
 
     body.admin-panel thead th.text-gray-400,
     body.admin-panel thead th.text-slate-400,
     body.admin-panel thead .text-gray-400,
     body.admin-panel thead .text-slate-400 {
-        color: #475569 !important; /* slate-600 */
+        color: rgb(var(--c-slate-600)) !important;
     }
 
     body.admin-panel .border-slate-100 {
-        border-color: #e2e8f0 !important; /* slate-200 */
+        border-color: rgb(var(--c-slate-200)) !important;
     }
 
     body.admin-panel .border-gray-100 {
-        border-color: #e5e7eb !important; /* gray-200 */
+        border-color: rgb(var(--c-gray-200)) !important;
     }
 }
 
@@ -148,7 +205,7 @@ body.admin-panel main {
     width: 100%;
     transform: scaleX(0);
     transform-origin: left center;
-    background: linear-gradient(90deg, #f97316 0%, #fb923c 45%, #fdba74 100%);
+    background: linear-gradient(90deg, #ec8560 0%, #f4b740 50%, #8b6fd6 100%);
     transition: transform 0.18s ease-out;
     opacity: 0;
 }
@@ -164,8 +221,8 @@ body.admin-panel main {
     height: 100%;
     opacity: 0;
     transform: translateX(-100%);
-    box-shadow: 0 0 12px #f97316, 0 0 5px #fb923c;
-    background: #fdba74;
+    box-shadow: 0 0 12px #ec8560, 0 0 5px #b39cf0;
+    background: #f6b397;
 }
 .admin-progress__peg.is-active {
     opacity: 1;
@@ -201,8 +258,8 @@ html.admin-progress-busy body {
     padding: 0.7rem 0.75rem;
     border-radius: 0.85rem;
     background: #fff;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+    border: 1px solid #f2e6dc;
+    box-shadow: 0 10px 30px rgba(74, 48, 38, 0.12);
     opacity: 0;
     transform: translateY(-8px) scale(0.98);
     transition: opacity 0.2s ease, transform 0.2s ease;
@@ -228,26 +285,26 @@ html.admin-progress-busy body {
     font-size: 0.8125rem;
     line-height: 1.35;
     font-weight: 600;
-    color: #0f172a;
+    color: #3a2a24;
 }
 .admin-toast__close {
     border: 0;
     background: transparent;
-    color: #94a3b8;
+    color: #ae978a;
     font-size: 1.1rem;
     line-height: 1;
     cursor: pointer;
     padding: 0 0.15rem;
 }
-.admin-toast__close:hover { color: #475569; }
+.admin-toast__close:hover { color: #6f5b52; }
 .admin-toast--success { border-color: #a7f3d0; background: #ecfdf5; }
 .admin-toast--success .admin-toast__icon { color: #059669; }
 .admin-toast--error { border-color: #fecaca; background: #fef2f2; }
 .admin-toast--error .admin-toast__icon { color: #dc2626; }
 .admin-toast--warning { border-color: #fde68a; background: #fffbeb; }
 .admin-toast--warning .admin-toast__icon { color: #d97706; }
-.admin-toast--info { border-color: #bfdbfe; background: #eff6ff; }
-.admin-toast--info .admin-toast__icon { color: #2563eb; }
+.admin-toast--info { border-color: #ddd1f8; background: #f7f3fe; }
+.admin-toast--info .admin-toast__icon { color: #6a4bb8; }
 
 .admin-confirm {
     position: fixed;
@@ -270,16 +327,16 @@ html.admin-progress-busy body {
 .admin-confirm__backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(15, 23, 42, 0.45);
+    background: rgba(58, 42, 36, 0.42);
     backdrop-filter: blur(2px);
 }
 .admin-confirm__panel {
     position: relative;
     width: min(24rem, 100%);
     background: #fff;
-    border-radius: 1rem;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.22);
+    border-radius: 1.25rem;
+    border: 1px solid #f2e6dc;
+    box-shadow: 0 20px 50px rgba(74, 48, 38, 0.22);
     padding: 1.25rem 1.25rem 1.1rem;
     text-align: center;
     transform: translateY(10px) scale(0.98);
@@ -300,18 +357,19 @@ html.admin-progress-busy body {
 .admin-confirm__icon svg { width: 1.35rem; height: 1.35rem; }
 .admin-confirm__icon--danger { background: #fef2f2; color: #dc2626; }
 .admin-confirm__icon--warning { background: #fffbeb; color: #d97706; }
-.admin-confirm__icon--primary { background: #eef2ff; color: #4f46e5; }
+.admin-confirm__icon--primary { background: #efe9fc; color: #6a4bb8; }
 .admin-confirm__title {
     margin: 0;
     font-size: 1rem;
-    font-weight: 700;
-    color: #0f172a;
+    font-family: 'Fredoka', 'Nunito', sans-serif;
+    font-weight: 600;
+    color: #3a2a24;
 }
 .admin-confirm__message {
     margin: 0.4rem 0 0;
     font-size: 0.8125rem;
     line-height: 1.45;
-    color: #64748b;
+    color: #654f45;
 }
 .admin-confirm__actions {
     display: flex;
@@ -320,19 +378,19 @@ html.admin-progress-busy body {
     margin-top: 1.1rem;
 }
 .admin-confirm__btn {
-    border-radius: 0.65rem;
+    border-radius: 999px;
     font-size: 0.8125rem;
-    font-weight: 600;
-    padding: 0.55rem 0.95rem;
+    font-weight: 700;
+    padding: 0.55rem 1.1rem;
     border: 1px solid transparent;
     cursor: pointer;
 }
 .admin-confirm__btn--ghost {
     background: #fff;
-    border-color: #e2e8f0;
-    color: #475569;
+    border-color: #f0e4da;
+    color: #6f5b52;
 }
-.admin-confirm__btn--ghost:hover { background: #f8fafc; }
+.admin-confirm__btn--ghost:hover { background: #fdf9f6; }
 .admin-confirm__btn--danger {
     background: #dc2626;
     color: #fff;
@@ -344,12 +402,29 @@ html.admin-progress-busy body {
 }
 .admin-confirm__btn--warning:hover { background: #b45309; }
 .admin-confirm__btn--primary {
-    background: #4f46e5;
+    background: #6a4bc4;
     color: #fff;
 }
-.admin-confirm__btn--primary:hover { background: #4338ca; }
+.admin-confirm__btn--primary:hover { background: #553a9e; }
 html.admin-confirm-open,
 html.admin-confirm-open body {
     overflow: hidden;
 }
 
+
+/* Admin readability: light status hues fail WCAG AA as text on white, so use their -700 shade */
+body.admin-panel :is(.text-emerald-400, .text-emerald-500, .text-emerald-600) { color: #047857; }
+body.admin-panel :is(.text-green-400, .text-green-500, .text-green-600) { color: #15803d; }
+body.admin-panel :is(.text-teal-400, .text-teal-500, .text-teal-600) { color: #0f766e; }
+body.admin-panel :is(.text-cyan-400, .text-cyan-500, .text-cyan-600) { color: #0e7490; }
+body.admin-panel :is(.text-sky-400, .text-sky-500, .text-sky-600) { color: #0369a1; }
+body.admin-panel :is(.text-amber-400, .text-amber-500, .text-amber-600) { color: #b45309; }
+body.admin-panel :is(.text-yellow-400, .text-yellow-500, .text-yellow-600) { color: #a16207; }
+body.admin-panel :is(.text-orange-400, .text-orange-500, .text-orange-600) { color: #c2410c; }
+body.admin-panel :is(.text-lime-500, .text-lime-600) { color: #4d7c0f; }
+body.admin-panel :is(.text-red-400, .text-red-500) { color: #dc2626; }
+body.admin-panel :is(.text-rose-400, .text-rose-500) { color: #e11d48; }
+body.admin-panel :is(.text-pink-400, .text-pink-500, .text-pink-600) { color: #be185d; }
+body.admin-panel :is(.text-fuchsia-500, .text-fuchsia-600) { color: #a21caf; }
+body.admin-panel :is(.text-purple-500, .text-purple-600) { color: #7e22ce; }
+body.admin-panel ::placeholder { color: rgb(var(--c-slate-400)); opacity: 1; }

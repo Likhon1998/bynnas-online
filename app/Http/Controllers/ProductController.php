@@ -565,7 +565,7 @@ class ProductController extends Controller
         }
 
         $validated = $request->validate([
-            'flag' => 'required|in:is_new_arrival,is_best_seller,is_combo',
+            'flag' => 'required|in:is_new_arrival,is_best_seller,is_featured,is_combo',
             'value' => 'required|boolean',
         ]);
 
@@ -578,6 +578,7 @@ class ProductController extends Controller
             'value' => (bool) $product->{$flag},
             'is_new_arrival' => (bool) $product->is_new_arrival,
             'is_best_seller' => (bool) $product->is_best_seller,
+            'is_featured' => (bool) $product->is_featured,
             'is_combo' => (bool) $product->is_combo,
         ]);
     }
@@ -1226,13 +1227,14 @@ class ProductController extends Controller
      */
     private function attachImportedImage(Product $product, string $url): void
     {
-        if (! filter_var($url, FILTER_VALIDATE_URL)) {
+        if (! $this->isPublicHttpUrl($url)) {
             return;
         }
 
         try {
             $response = Http::timeout(12)
-                ->withHeaders(['User-Agent' => 'BynnasSocial-ProductImport/1.0'])
+                ->withOptions(['allow_redirects' => false])
+                ->withHeaders(['User-Agent' => 'ProductImport/1.0'])
                 ->get($url);
 
             if (! $response->successful()) {
@@ -1245,6 +1247,9 @@ class ProductController extends Controller
             }
 
             $mime = (string) ($response->header('Content-Type') ?? '');
+            if (! str_starts_with(strtolower($mime), 'image/')) {
+                return;
+            }
             $ext = match (true) {
                 str_contains($mime, 'png') => 'png',
                 str_contains($mime, 'webp') => 'webp',
@@ -1264,6 +1269,33 @@ class ProductController extends Controller
         } catch (\Throwable) {
             // Image is optional — product row still imports without it.
         }
+    }
+
+    /** Blocks CSV image URLs that point at the server itself or a private network. */
+    private function isPublicHttpUrl(string $url): bool
+    {
+        if (! filter_var($url, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        $parts = parse_url($url);
+        if (! in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true) || empty($parts['host'])) {
+            return false;
+        }
+
+        $host = trim($parts['host'], '[]');
+        $ips = filter_var($host, FILTER_VALIDATE_IP) ? [$host] : (gethostbynamel($host) ?: []);
+        if ($ips === []) {
+            return false;
+        }
+
+        foreach ($ips as $ip) {
+            if (! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function applyImeiList(Product $product, string $rawList): int

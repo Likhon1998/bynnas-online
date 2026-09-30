@@ -28,6 +28,7 @@ class Order extends Model
         'mobile_paid',
         'change_amount',
         'payment_method',
+        'payment_reference',
         'status',
         'delivery_charge',
         'delivery_zone',

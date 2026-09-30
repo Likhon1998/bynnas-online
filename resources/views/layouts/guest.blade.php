@@ -23,7 +23,7 @@
                 </svg>
                 <h1 class="text-4xl font-bold tracking-tight">{{ config('app.name', 'Bynnas Social') }}</h1>
             </div>
-            <p class="text-slate-400 text-lg max-w-md">Absolute transparency and seamless inventory management for modern retail.</p>
+            <p class="text-slate-400 text-lg max-w-md">Orders, inventory and accounts for your online store — in one place.</p>
         </div>
 
         <div class="w-full md:w-1/2 flex flex-col justify-center items-center p-6 sm:p-12">

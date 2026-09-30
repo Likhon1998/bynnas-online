@@ -8,6 +8,7 @@ class OrderStatusLog extends Model
 {
     protected $fillable = [
         'order_id',
+        'from_status',
         'status',
         'label',
         'note',

@@ -122,11 +122,12 @@ class DeliveryChargeService
             // Legacy keys kept for any cached storefront script still reading them.
             'inside_dhaka' => (float) ($fees[self::ZONE_INSIDE] ?? $s->delivery_inside_dhaka ?? 60),
             'outside_dhaka' => (float) ($fees[self::ZONE_OUTSIDE] ?? $s->delivery_outside_dhaka ?? 120),
-            'free_enabled' => (bool) ($s->delivery_free_enabled ?? true),
-            'free_min_amount' => (float) ($s->delivery_free_min_amount ?? 10000),
+            'free_enabled' => (bool) ($s->delivery_free_enabled ?? false),
+            'free_min_amount' => (float) ($s->delivery_free_min_amount ?? 0),
             'cod_enabled' => (bool) ($s->delivery_cod_enabled ?? true),
             'confirmation_enabled' => (bool) ($s->delivery_confirmation_enabled ?? false),
             'confirmation_amount' => (float) ($s->delivery_confirmation_amount ?? 0),
+            'confirmation_instructions' => (string) ($s->delivery_confirmation_instructions ?? ''),
             'payment_methods' => $this->allowedPaymentMethods($s),
             'currency_symbol' => $s->currency_symbol ?: '৳',
         ];

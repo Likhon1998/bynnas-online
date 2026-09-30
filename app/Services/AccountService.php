@@ -362,10 +362,20 @@ class AccountService
         ];
 
         if ($order->isOnlineOrder()) {
-            $paymentAccount = $this->transactionExists($order->shop_id, 'web_settlement', Order::class, $order->id)
-                ? $this->getAccount($order->shop_id, 'WEB-CASH')
-                : $this->getAccount($order->shop_id, 'WEB-COD');
-            $lines[] = ['account' => $paymentAccount, 'debit' => 0, 'credit' => $netAmount, 'counter_id' => null];
+            $webCash = $this->getAccount($order->shop_id, 'WEB-CASH');
+            if ($this->transactionExists($order->shop_id, 'web_settlement', Order::class, $order->id)) {
+                $lines[] = ['account' => $webCash, 'debit' => 0, 'credit' => $netAmount, 'counter_id' => null];
+            } else {
+                // Mirrors postWebSale: the confirmation advance went to cash, only the rest to COD receivable.
+                $advance = min($netAmount, $order->shopAdvancePaid());
+                $codPart = round($netAmount - $advance, 2);
+                if ($advance > 0.009) {
+                    $lines[] = ['account' => $webCash, 'debit' => 0, 'credit' => $advance, 'counter_id' => null];
+                }
+                if ($codPart > 0.009 || $advance <= 0.009) {
+                    $lines[] = ['account' => $this->getAccount($order->shop_id, 'WEB-COD'), 'debit' => 0, 'credit' => $codPart, 'counter_id' => null];
+                }
+            }
         } else {
             $tender = $order->settledTenderBreakdown();
             $cash = $tender['cash'];

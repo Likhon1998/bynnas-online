@@ -22,8 +22,8 @@
                 <img src="{{ $navIcon }}?v={{ @filemtime(public_storage_path($navSettings->favicon_path ?: $navSettings->logo_path)) ?: time() }}" alt="" class="sidebar-brand-mark h-8 w-8 object-contain shrink-0 rounded-lg" width="32" height="32">
                 <span class="sidebar-brand-text truncate" x-show="!sidebarCollapsed">{{ $navName }}</span>
             @else
-                <span class="sidebar-brand-mark flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                <span class="sidebar-brand-mark sidebar-brand-lottie flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
+                    @include('website.partials.lottie', ['name' => 'bear'])
                 </span>
                 <span class="sidebar-brand-text truncate" x-show="!sidebarCollapsed">{{ $navName }}</span>
             @endif
@@ -40,7 +40,7 @@
             </svg>
         </button>
 
-        <button type="button" @click="sidebarOpen = false" class="admin-sidebar-close h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white/10 hover:text-white" aria-label="Close menu">
+        <button type="button" @click="sidebarOpen = false" class="admin-sidebar-close h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-blue-50 hover:text-blue-600" aria-label="Close menu">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
     </div>
@@ -56,7 +56,7 @@
         $isTeam = request()->routeIs('roles.*', 'staff.*') || request()->routeIs('counters.index', 'counters.store', 'counters.update');
         $retailEnabled = retail_enabled();
         $pendingWebOrders = 0;
-        if (Auth::user()->isAdminUser()) {
+        if (Auth::user()->can('manage orders')) {
             $pendingWebOrders = \App\Models\Order::where('shop_id', Auth::user()->shop_id)
                 ->onlineOrders()
                 ->whereIn('status', \App\Support\OrderStatus::newValues())
@@ -85,15 +85,14 @@
         </a>
         @endcan
 
-       @can('view sales ledger')
-        @if($retailEnabled)
+        @if($retailEnabled && Auth::user()->can('view sales ledger'))
         <a :title="sidebarCollapsed ? 'Sales' : null" href="{{ route('sales.index') }}"
            class="nav-link nav-tone-sales {{ request()->routeIs('sales.*') ? 'is-active' : '' }}">
             <span class="nav-ico-wrap"><svg class="nav-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></span>
             <span class="nav-label">Sales</span>
         </a>
         @endif
-        @if(Auth::user()->isAdminUser())
+        @can('manage orders')
         <a :title="sidebarCollapsed ? 'Online Orders' : null" href="{{ route('online-orders.index') }}"
            class="nav-link nav-link--badge nav-tone-orders {{ request()->routeIs('online-orders.*') ? 'is-active' : '' }}">
             <span class="nav-ico-wrap"><svg class="nav-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg></span>
@@ -102,7 +101,6 @@
                 <span class="nav-badge">{{ $pendingWebOrders }}</span>
             @endif
         </a>
-        @endif
         @endcan
 
         @can('manage inventory')
@@ -113,7 +111,7 @@
         </a>
         @endcan
 
-        @can('view sales ledger')
+        @can('manage customers')
         <a :title="sidebarCollapsed ? 'Customers' : null" href="{{ route('customers.index') }}"
            class="nav-link nav-tone-customers {{ request()->routeIs('customers.index', 'customers.create', 'customers.edit', 'customers.show') ? 'is-active' : '' }}">
             <span class="nav-ico-wrap"><svg class="nav-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg></span>
@@ -155,13 +153,13 @@
         </a>
         @endcan
 
-        @if(Auth::user()->isAdminUser())
+        @can('manage accounts')
         <a :title="sidebarCollapsed ? 'Accounts' : null" href="{{ route('accounts.opening-balance') }}"
            class="nav-link nav-tone-accounts {{ request()->routeIs('accounts.*') ? 'is-active' : '' }}">
             <span class="nav-ico-wrap"><svg class="nav-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></span>
             <span class="nav-label">Accounts</span>
         </a>
-        @endif
+        @endcan
 
         @can('manage inventory')
         <a :title="sidebarCollapsed ? 'Low Stock' : null" href="{{ route('reports.low_stock') }}"
@@ -238,7 +236,7 @@
                 </div>
         @endif
 
-        @if(Auth::user()->isAdminUser())
+        @can('view reports')
         <button type="button" :title="sidebarCollapsed ? 'Reports' : null" @click="expandThen('insightsOpen')"
                 class="nav-group nav-tone-reports {{ $isInsights ? 'is-open' : '' }}">
             <span class="nav-group-main">
@@ -256,7 +254,7 @@
             <a href="{{ route('pos.settings.edit') }}" class="nav-sub {{ request()->routeIs('pos.settings.*') ? 'is-active' : '' }}"><svg class="nav-sub-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span>POS Settings</span></a>
             @endif
             </div>
-        @endif
+        @endcan
 
         @can('manage website')
         <button type="button" :title="sidebarCollapsed ? 'Website' : null" @click="expandThen('websiteOpen')"
@@ -305,6 +303,16 @@
         </div>
         @endif
     </nav>
+
+    <div class="sidebar-foot">
+        <a href="{{ route('home') }}" target="_blank" rel="noopener" class="sidebar-store-card bb-lottie-host" :title="sidebarCollapsed ? 'View store' : null">
+            @include('website.partials.lottie', ['name' => 'rocket', 'hover' => true])
+            <span class="sidebar-store-copy min-w-0">
+                <strong class="truncate">View your store</strong>
+                <small>See what shoppers see</small>
+            </span>
+        </a>
+    </div>
 </aside>
 
 <header class="admin-topbar"
@@ -319,7 +327,7 @@
         @if($retailEnabled && Auth::user()->can('process pos sales'))
             <a href="{{ route('pos.index') }}"
                onclick="return window.launchPosTerminal(this.href)"
-               class="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-[12px] font-semibold text-white hover:bg-slate-800">
+               class="topbar-pill topbar-pill--pos">
                 <span class="sm:hidden">POS</span>
                 <span class="hidden sm:inline">POS Terminal</span>
             </a>
@@ -327,22 +335,21 @@
 
         @if(Auth::check())
             <a href="{{ route('home') }}" target="_blank"
-               class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-[12px] font-semibold text-white hover:bg-blue-700">
+               class="topbar-pill topbar-pill--store">
                 <span class="sm:hidden">Store</span>
                 <span class="hidden sm:inline">View Store</span>
             </a>
         @endif
 
-        @can('view sales ledger')
-            @if(Auth::user()->isAdminUser())
+        @can('manage orders')
             <div class="relative"
                  x-data="onlineOrderBell(@js(route('online-orders.notifications')), @js(route('online-orders.notifications.seen')))"
                  @keydown.escape.window="if (panelOpen) closePanel()"
                  @click.outside="if (panelOpen) closePanel()">
                 <button type="button"
                         @click="togglePanel($event)"
-                        class="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-800"
-                        :class="panelOpen ? 'border-teal-300 bg-teal-50 text-teal-700' : ''"
+                        class="topbar-icon-btn relative inline-flex h-9 w-9 items-center justify-center border border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                        :class="panelOpen ? 'border-blue-300 bg-blue-50 text-blue-700' : ''"
                         title="Online order notifications"
                         aria-haspopup="true"
                         :aria-expanded="panelOpen">
@@ -354,7 +361,7 @@
                 <div x-show="panelOpen"
                      x-cloak
                      x-transition.opacity.duration.150ms
-                     class="absolute right-0 top-[calc(100%+8px)] z-50 admin-fluid-panel overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10"
+                     class="absolute right-0 top-[calc(100%+8px)] z-50 admin-fluid-panel overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10"
                      style="display: none;">
                     <div class="flex items-center justify-between border-b border-slate-100 px-3.5 py-2.5">
                         <p class="text-[13px] font-bold text-slate-900">Online orders</p>
@@ -367,36 +374,38 @@
                         </template>
 
                         <template x-if="!loading && !error && items.length === 0">
-                            <p class="px-4 py-8 text-center text-[12px] text-slate-400">No online orders yet.</p>
+                            <div class="px-4 py-7 text-center">
+                                @include('website.partials.lottie', ['name' => 'package', 'class' => 'h-12 w-12'])
+                                <p class="mt-1 text-[12px] font-semibold text-slate-400">No online orders yet.</p>
+                            </div>
                         </template>
 
                         <template x-for="item in items" :key="item.id">
                             <a :href="item.url"
                                @click="openItem(item, $event)"
                                class="block border-b border-slate-50 px-3.5 py-2.5 transition last:border-0"
-                               :class="item.is_new ? 'bg-teal-50/80 hover:bg-teal-50' : 'bg-white hover:bg-slate-50'">
+                               :class="item.is_new ? 'bg-blue-50/80 hover:bg-blue-50' : 'bg-white hover:bg-slate-50'">
                                 <div class="flex items-start justify-between gap-2">
                                     <div class="min-w-0">
                                         <div class="flex items-center gap-1.5">
-                                            <p class="truncate text-[12px] font-bold" :class="item.is_new ? 'text-teal-900' : 'text-slate-700'" x-text="item.invoice"></p>
-                                            <span x-show="item.is_new" class="rounded-full bg-teal-700 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">New</span>
+                                            <p class="truncate text-[12px] font-bold" :class="item.is_new ? 'text-blue-900' : 'text-slate-700'" x-text="item.invoice"></p>
+                                            <span x-show="item.is_new" class="rounded-full bg-blue-700 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">New</span>
                                         </div>
-                                        <p class="mt-0.5 truncate text-[11px]" :class="item.is_new ? 'text-teal-700' : 'text-slate-500'" x-text="item.customer + (item.phone ? ' · ' + item.phone : '')"></p>
-                                        <p class="mt-0.5 text-[10px]" :class="item.is_new ? 'text-teal-500' : 'text-slate-400'" x-text="item.status_label + ' · ' + item.at"></p>
+                                        <p class="mt-0.5 truncate text-[11px]" :class="item.is_new ? 'text-blue-700' : 'text-slate-500'" x-text="item.customer + (item.phone ? ' · ' + item.phone : '')"></p>
+                                        <p class="mt-0.5 text-[10px]" :class="item.is_new ? 'text-blue-500' : 'text-slate-400'" x-text="item.status_label + ' · ' + item.at"></p>
                                     </div>
-                                    <p class="shrink-0 text-[11px] font-bold" :class="item.is_new ? 'text-teal-800' : 'text-slate-500'" x-text="'Tk ' + item.total"></p>
+                                    <p class="shrink-0 text-[11px] font-bold" :class="item.is_new ? 'text-blue-800' : 'text-slate-500'" x-text="'Tk ' + item.total"></p>
                                 </div>
                             </a>
                         </template>
                     </div>
 
                     <a href="{{ route('online-orders.index') }}"
-                       class="block border-t border-slate-100 bg-slate-50 px-3.5 py-2.5 text-center text-[12px] font-bold text-teal-700 hover:bg-slate-100">
+                       class="block border-t border-slate-100 bg-slate-50 px-3.5 py-2.5 text-center text-[12px] font-bold text-blue-700 hover:bg-slate-100">
                         View all online orders
                     </a>
                 </div>
             </div>
-            @endif
         @endcan
 
         @if(Auth::check())
@@ -406,7 +415,7 @@
                  @click.outside="panelOpen = false">
                 <button type="button"
                         @click="toggle()"
-                        class="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-800"
+                        class="topbar-icon-btn relative inline-flex h-9 w-9 items-center justify-center border border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
                         :class="panelOpen ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : ''"
                         title="Alerts: leads, low stock, abandoned carts, delivery issues"
                         aria-haspopup="true"
@@ -417,7 +426,7 @@
                 </button>
 
                 <div x-show="panelOpen" x-cloak x-transition.opacity.duration.150ms
-                     class="absolute right-0 top-[calc(100%+8px)] z-50 admin-fluid-panel overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10"
+                     class="absolute right-0 top-[calc(100%+8px)] z-50 admin-fluid-panel overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10"
                      style="display: none;">
                     <div class="flex items-center justify-between border-b border-slate-100 px-3.5 py-2.5">
                         <p class="text-[13px] font-bold text-slate-900">Alerts</p>
@@ -425,7 +434,10 @@
                     </div>
                     <div class="max-h-[360px] overflow-y-auto">
                         <template x-if="!loading && items.length === 0">
-                            <p class="px-4 py-8 text-center text-[12px] text-slate-400">No alerts yet.</p>
+                            <div class="px-4 py-7 text-center">
+                                @include('website.partials.lottie', ['name' => 'check', 'class' => 'h-12 w-12'])
+                                <p class="mt-1 text-[12px] font-semibold text-slate-400">All caught up, no alerts.</p>
+                            </div>
                         </template>
                         <template x-for="item in items" :key="item.id">
                             <a :href="item.url || '#'" @click="open(item, $event)"
@@ -448,8 +460,8 @@
         <div class="flex items-center pl-0.5 sm:pl-1">
             <x-dropdown align="right" width="48">
                 <x-slot name="trigger">
-                    <button class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50">
-                        <span class="flex h-7 w-7 items-center justify-center rounded-full bg-teal-50 text-teal-800 text-xs font-bold">
+                    <button class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1 pl-1 pr-2.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50">
+                        <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-xs font-extrabold">
                             {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
                         </span>
                         <span class="hidden lg:inline max-w-[100px] truncate">{{ Auth::user()->name }}</span>

@@ -2,7 +2,8 @@
     use App\Support\AccountUi;
 @endphp
 
-<x-accounts.panel title="Opening Balances" subtitle="Set starting balances per account. Each counter has its own cash account.">
+@php $retail = retail_enabled(); @endphp
+<x-accounts.panel title="Opening Balances" :subtitle="$retail ? 'Set starting balances per account. Each counter has its own cash account.' : 'Set starting balances per account.'">
     <form action="{{ route('accounts.opening-balance.update') }}" method="POST">
         @csrf
         <div class="overflow-x-auto">
@@ -12,7 +13,7 @@
                         <th class="px-6 py-3 text-left">Account Code</th>
                         <th class="px-6 py-3 text-left">Account Name</th>
                         <th class="px-6 py-3 text-left">Account Type</th>
-                        <th class="px-6 py-3 text-left">Counter</th>
+                        @if($retail)<th class="px-6 py-3 text-left">Counter</th>@endif
                         <th class="px-6 py-3 text-right">Opening Balance</th>
                         <th class="px-6 py-3 text-right">Current Balance</th>
                     </tr>
@@ -26,7 +27,7 @@
                             <td class="px-6 py-4 whitespace-nowrap">
                                 @include('accounts.partials.type-badge', ['type' => $account->type])
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ $account->counter?->name ?? '—' }}</td>
+                            @if($retail)<td class="px-6 py-4 whitespace-nowrap text-gray-500">{{ $account->counter?->name ?? '—' }}</td>@endif
                             <td class="px-6 py-4 whitespace-nowrap text-right">
                                 <input
                                     type="number"

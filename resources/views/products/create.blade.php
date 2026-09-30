@@ -3,7 +3,7 @@
         <div class="flex justify-between items-center">
             <div>
                 <h2 class="text-lg font-semibold text-slate-900">{{ __('Add New Product') }}</h2>
-                <p class="text-sm text-slate-500 mt-0.5">Everything you enter here shows on the online store and POS.</p>
+                <p class="text-sm text-slate-500 mt-0.5">Everything you enter here shows on the online store{{ retail_enabled() ? ' and POS' : '' }}.</p>
             </div>
             <a href="{{ $returnTo['url'] }}" class="text-sm font-medium text-slate-500 hover:text-blue-600 transition flex items-center gap-1.5">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>

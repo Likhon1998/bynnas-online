@@ -129,7 +129,10 @@ class LandingPageController extends Controller
             'special_offer_text' => $data['special_offer_text'] ?? null,
             'trusted_by_text' => $data['trusted_by_text'] ?? null,
             'footer_tagline' => $data['footer_tagline'] ?? null,
-            'home_copy' => $website->homeCopyDefaults($data['home_copy'] ?? []),
+            'home_copy' => array_intersect_key(
+                array_filter($data['home_copy'] ?? [], fn ($v) => filled($v)),
+                $website->homeCopyDefaults()
+            ),
             'deals_kicker' => $data['deals_kicker'] ?? null,
             'deals_title' => $data['deals_title'] ?? null,
             'deals_title_accent' => $data['deals_title_accent'] ?? null,

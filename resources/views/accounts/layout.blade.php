@@ -72,9 +72,11 @@
         <div x-show="tab === 'cash-book'" x-cloak>
             @include('accounts.partials.tabs.cash-book')
         </div>
-        <div x-show="tab === 'daily-summary'" x-cloak>
-            @include('accounts.partials.tabs.daily-summary')
-        </div>
+        @if(retail_enabled())
+            <div x-show="tab === 'daily-summary'" x-cloak>
+                @include('accounts.partials.tabs.daily-summary')
+            </div>
+        @endif
         <div x-show="tab === 'petty-cash'" x-cloak>
             @include('accounts.partials.tabs.petty-cash')
         </div>

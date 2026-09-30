@@ -10,6 +10,11 @@
     ];
 @endphp
 @section('title', $blog->title.' — '.($settings->store_name ?? config('app.name', 'Bynnas Social')))
+@section('meta_description', $blog->excerpt ?: \Illuminate\Support\Str::limit(strip_tags((string) $blog->body), 160))
+@section('og_type', 'article')
+@if($blog->cover_image)
+    @section('og_image', $blog->coverUrl())
+@endif
 @section('content')
 <div class="max-w-7xl mx-auto px-4 py-8">
     <p class="text-xs text-slate-400 mb-5">

@@ -13,7 +13,7 @@
 
     <div class="w-full min-w-0 pb-4 text-[12px] leading-snug text-slate-700"
          x-data="productSales(@js($pageIds), @js(route('products.barcodes.print')))"
-         style="--pl-blue:#4F46E5;--pl-sale:#EF4444;--pl-green:#10B981;--pl-amber:#F59E0B;--pl-purple:#8B5CF6;--pl-sky:#3B82F6;">
+         style="--pl-blue:#6a4bc4;--pl-sale:#c43d63;--pl-green:#1d7c6f;--pl-amber:#a8620c;--pl-purple:#7657c9;--pl-sky:#2a74a4;">
 
         {{-- Compact top bar --}}
         <div class="mb-2 flex flex-wrap items-center gap-1.5">
@@ -248,7 +248,8 @@
                             <th class="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider">Stock</th>
                             <th class="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider">Value</th>
                             <th class="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-center" title="Show in homepage New Arrivals">New</th>
-                            <th class="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-center" title="Show in homepage Trending">Trend</th>
+                            <th class="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-center" title="Show in homepage Featured Products">Feat</th>
+                            <th class="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-center" title="Best seller (Best Sellers filter and badge)">Best</th>
                             <th class="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-center" title="Combo pack (homepage Combo Deals)">Combo</th>
                             <th class="px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-center">Status</th>
                             <th class="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-right">Actions</th>
@@ -347,8 +348,15 @@
                                 </td>
                                 <td class="px-2.5 py-2.5 align-middle text-center">
                                     <input type="checkbox"
+                                           class="h-3.5 w-3.5 rounded border-blue-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                           title="Featured on homepage"
+                                           @checked($product->is_featured)
+                                           @change="toggleHomepageFlag({{ $product->id }}, 'is_featured', $event.target.checked, $event.target)">
+                                </td>
+                                <td class="px-2.5 py-2.5 align-middle text-center">
+                                    <input type="checkbox"
                                            class="h-3.5 w-3.5 rounded border-violet-300 text-violet-600 focus:ring-violet-500 cursor-pointer"
-                                           title="Trending on homepage"
+                                           title="Best seller"
                                            @checked($product->is_best_seller)
                                            @change="toggleHomepageFlag({{ $product->id }}, 'is_best_seller', $event.target.checked, $event.target)">
                                 </td>
@@ -396,7 +404,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="12" class="px-4 py-12 text-center">
+                                <td colspan="13" class="px-4 py-12 text-center">
                                     <p class="text-[12px] font-medium text-slate-800">No products found</p>
                                     <p class="text-[11px] text-slate-500 mt-1 mb-2">Try clearing filters or add a new product.</p>
                                     <a href="{{ route('products.create') }}" class="text-[12px] font-medium text-indigo-600 hover:text-indigo-700">Add your first product →</a>
@@ -471,7 +479,7 @@
                         <p class="mt-1 text-[10px] text-slate-400" x-show="saleProduct && saleForm.percent">
                             Offer ≈
                             <span class="font-semibold text-slate-700"
-                                  x-text="'Tk ' + Math.round(Math.max(0, Number(saleProduct.selling_price) * (1 - (Number(saleForm.percent || 0) / 100)))).toLocaleString()"></span>
+                                  x-text="'Tk ' + Math.round(Math.max(0, Number(saleProduct?.selling_price || 0) * (1 - (Number(saleForm.percent || 0) / 100)))).toLocaleString()"></span>
                         </p>
                     </div>
                     <div x-show="saleForm.discount_type === 'tk'">

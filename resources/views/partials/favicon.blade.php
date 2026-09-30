@@ -8,11 +8,7 @@
     if ($faviconUrl && ! str_contains($faviconUrl, '?')) {
         $faviconUrl .= '?v='.$faviconVer;
     }
-    $applePath = 'cms/favicon/akhitelecom-apple.png';
-    $appleFull = public_storage_path($applePath);
-    $appleUrl = is_file($appleFull)
-        ? public_storage_url($applePath).'?v='.(@filemtime($appleFull) ?: $faviconVer)
-        : $faviconUrl;
+    $appleUrl = $faviconUrl;
     $faviconType = str_ends_with(strtolower(parse_url($faviconUrl, PHP_URL_PATH) ?? ''), '.svg')
         ? 'image/svg+xml'
         : 'image/png';

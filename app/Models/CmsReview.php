@@ -20,6 +20,32 @@ class CmsReview extends Model
         'rating' => 'integer',
     ];
 
+    protected static function booted(): void
+    {
+        $sync = function (CmsReview $review) {
+            foreach (array_unique(array_filter([$review->product_id, $review->getOriginal('product_id')])) as $productId) {
+                static::syncProductRating((int) $productId);
+            }
+        };
+
+        static::saved($sync);
+        static::deleted($sync);
+    }
+
+    /** Storefront stars/review counts come only from published reviews. */
+    public static function syncProductRating(int $productId): void
+    {
+        $stats = static::where('product_id', $productId)
+            ->where('is_published', true)
+            ->selectRaw('COUNT(*) as total, AVG(rating) as average')
+            ->first();
+
+        Product::whereKey($productId)->update([
+            'rating' => round((float) ($stats->average ?? 0), 1),
+            'review_count' => (int) ($stats->total ?? 0),
+        ]);
+    }
+
     public function shop()
     {
         return $this->belongsTo(Shop::class);

@@ -25,11 +25,11 @@ class OrderCancellationController extends Controller
     public function cancel(Request $request, Order $order)
     {
         $user = Auth::user();
-        if (! $user || ! $user->isAdminUser()) {
-            abort(403, 'Online orders are only available to shop admins.');
+        if (! $user || ! $user->can('manage orders')) {
+            abort(403, 'You do not have permission to manage orders.');
         }
 
-        if ($order->shop_id !== $user->shop_id || ! $order->isOnlineOrder()) {
+        if ((int) $order->shop_id !== (int) $user->shop_id || ! $order->isOnlineOrder()) {
             abort(403, 'Unauthorized Access');
         }
 

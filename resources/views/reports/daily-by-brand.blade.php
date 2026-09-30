@@ -1,4 +1,5 @@
 <x-app-layout>
+    @php $retail = retail_enabled(); @endphp
     <div class="pt-0 pb-5">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
 
@@ -17,7 +18,7 @@
                         <div>
                             <span class="text-[10px] font-bold text-cyan-400 uppercase tracking-[0.15em]">Brand performance</span>
                             <h2 class="text-lg font-bold text-white leading-tight">Sales by Brand</h2>
-                            <p class="text-xs text-slate-300">Units &amp; revenue per brand — POS + website completed orders.</p>
+                            <p class="text-xs text-slate-300">Units &amp; revenue per brand — {{ $retail ? 'POS + website' : 'website' }} completed orders.</p>
                         </div>
                     </div>
 
@@ -74,7 +75,7 @@
             </div>
 
             {{-- Summary cards --}}
-            <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div class="grid grid-cols-2 {{ $retail ? 'lg:grid-cols-5' : 'lg:grid-cols-4' }} gap-4">
                 <div class="bg-slate-900 rounded-2xl p-5 relative overflow-hidden">
                     <div class="relative">
                         <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Selling Amount</p>
@@ -92,11 +93,13 @@
                     <p class="text-[22px] font-black {{ $summary->total_profit >= 0 ? 'text-emerald-600' : 'text-rose-600' }} tracking-tight leading-none">{{ format_taka($summary->total_profit) }}</p>
                     <p class="text-xs text-slate-500 mt-2">Selling − purchase cost</p>
                 </div>
+                @if($retail)
                 <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
                     <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">POS Sales</p>
                     <p class="text-[22px] font-black text-gray-900 tracking-tight leading-none">{{ format_taka($summary->pos_revenue) }}</p>
                     <p class="text-xs text-slate-500 mt-2">{{ $summary->pos_units }} units from counters</p>
                 </div>
+                @endif
                 <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
                     <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Website Sales</p>
                     <p class="text-[22px] font-black text-gray-900 tracking-tight leading-none">{{ format_taka($summary->web_revenue) }}</p>
@@ -123,8 +126,10 @@
                                 <th class="px-5 py-3 text-[10px] font-black text-amber-700 uppercase tracking-[0.12em] text-right">Purchase Cost</th>
                                 <th class="px-5 py-3 text-[10px] font-black text-cyan-800 uppercase tracking-[0.12em] text-right">Selling Amount</th>
                                 <th class="px-5 py-3 text-[10px] font-black text-emerald-700 uppercase tracking-[0.12em] text-right">Profit</th>
+                                @if($retail)
                                 <th class="px-5 py-3 text-[10px] font-black text-emerald-700 uppercase tracking-[0.12em] text-right">POS</th>
                                 <th class="px-5 py-3 text-[10px] font-black text-sky-700 uppercase tracking-[0.12em] text-right">Website</th>
+                                @endif
                                 <th class="px-5 py-3 text-[10px] font-black text-slate-600 uppercase tracking-[0.12em] text-right">Share</th>
                             </tr>
                         </thead>
@@ -138,6 +143,7 @@
                                     <td class="px-5 py-3 text-sm font-semibold text-amber-700 text-right">{{ format_taka($row->cost) }}</td>
                                     <td class="px-5 py-3 text-sm font-black text-cyan-700 text-right">{{ format_taka($row->revenue) }}</td>
                                     <td class="px-5 py-3 text-sm font-bold {{ $row->profit >= 0 ? 'text-emerald-600' : 'text-rose-600' }} text-right">{{ format_taka($row->profit) }}</td>
+                                    @if($retail)
                                     <td class="px-5 py-3 text-sm text-slate-500 text-right">
                                         <span class="font-medium text-slate-700">{{ format_taka($row->pos_revenue) }}</span>
                                         <span class="text-slate-500 text-xs"> · {{ $row->pos_sold }}u</span>
@@ -146,11 +152,12 @@
                                         <span class="font-medium text-slate-700">{{ format_taka($row->web_revenue) }}</span>
                                         <span class="text-slate-500 text-xs"> · {{ $row->web_sold }}u</span>
                                     </td>
+                                    @endif
                                     <td class="px-5 py-3 text-sm font-bold text-slate-600 text-right">{{ number_format(($row->revenue / $revTotal) * 100, 1) }}%</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="px-5 py-10 text-center text-sm text-gray-400">No brand sales for this period. Complete POS checkouts or deliver website orders to see data here.</td>
+                                    <td colspan="{{ $retail ? 9 : 7 }}" class="px-5 py-10 text-center text-sm text-gray-400">No brand sales for this period. {{ $retail ? 'Complete POS checkouts or deliver website orders' : 'Complete website orders' }} to see data here.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -174,8 +181,10 @@
                                 <th class="px-5 py-3 text-[10px] font-black text-amber-700 uppercase tracking-[0.12em] text-right">Purchase Cost</th>
                                 <th class="px-5 py-3 text-[10px] font-black text-cyan-800 uppercase tracking-[0.12em] text-right">Selling Amount</th>
                                 <th class="px-5 py-3 text-[10px] font-black text-emerald-700 uppercase tracking-[0.12em] text-right">Profit</th>
+                                @if($retail)
                                 <th class="px-5 py-3 text-[10px] font-black text-emerald-700 uppercase tracking-[0.12em] text-right">POS</th>
                                 <th class="px-5 py-3 text-[10px] font-black text-sky-700 uppercase tracking-[0.12em] text-right">Website</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
@@ -192,13 +201,15 @@
                                         <td class="px-5 py-3 text-sm font-semibold text-amber-700 text-right">{{ format_taka($row->cost) }}</td>
                                         <td class="px-5 py-3 text-sm font-black text-cyan-700 text-right">{{ format_taka($row->revenue) }}</td>
                                         <td class="px-5 py-3 text-sm font-bold {{ $row->profit >= 0 ? 'text-emerald-600' : 'text-rose-600' }} text-right">{{ format_taka($row->profit) }}</td>
+                                        @if($retail)
                                         <td class="px-5 py-3 text-sm text-slate-700 text-right">{{ format_taka($row->pos_revenue) }} <span class="text-xs text-slate-500">({{ $row->pos_sold }})</span></td>
                                         <td class="px-5 py-3 text-sm text-slate-700 text-right">{{ format_taka($row->web_revenue) }} <span class="text-xs text-slate-500">({{ $row->web_sold }})</span></td>
+                                        @endif
                                     </tr>
                                 @endforeach
                             @empty
                                 <tr>
-                                    <td colspan="8" class="px-5 py-10 text-center text-sm text-slate-500">No daily brand sales in this period.</td>
+                                    <td colspan="{{ $retail ? 8 : 6 }}" class="px-5 py-10 text-center text-sm text-slate-500">No daily brand sales in this period.</td>
                                 </tr>
                             @endforelse
                         </tbody>

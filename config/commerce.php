@@ -9,6 +9,12 @@ return [
     'abandoned_cart_minutes' => (int) env('ABANDONED_CART_MINUTES', 60),
 
     /*
+    | Active / contacted carts idle this many days are closed as lost so the
+    | recovery list only shows carts still worth following up. 0 disables it.
+    */
+    'abandoned_cart_expire_days' => (int) env('ABANDONED_CART_EXPIRE_DAYS', 30),
+
+    /*
     | Shipped orders not delivered after this many days raise a delivery issue
     | notification for admins.
     */
@@ -24,6 +30,7 @@ return [
         'high_value_spend' => (float) env('SEGMENT_HIGH_VALUE_SPEND', 15000),
         'frequent_orders' => (int) env('SEGMENT_FREQUENT_ORDERS', 5),
         'inactive_days' => (int) env('SEGMENT_INACTIVE_DAYS', 90),
+        'cod_risk_returns' => (int) env('SEGMENT_COD_RISK_RETURNS', 2),
     ],
 
 ];

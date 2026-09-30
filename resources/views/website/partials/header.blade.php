@@ -7,10 +7,32 @@
         : time();
     $navLinks = $mainNav ?? collect();
     $headerCopy = data_get($settings, 'home_copy') ?: [];
-    $headerTagline = $headerCopy['logo_tagline'] ?? 'Kids & Baby Store';
+    $headerTagline = trim((string) ($headerCopy['logo_tagline'] ?? ''));
+    $headerTagline = $headerTagline === '-' ? '' : $headerTagline;
+    $hasAboutPage = $navLinks->isEmpty() && \App\Models\CmsPage::where('slug', 'about-us')->where('is_published', true)->exists();
 @endphp
 
 <div class="gaget-sticky-header" x-data="{ searchOpen: false }">
+    @php
+        $topOffer = trim((string) ($settings->special_offer_text ?? ''));
+        $topLinks = $topBarNav ?? collect();
+    @endphp
+    @if($topOffer !== '' || $topLinks->isNotEmpty())
+        <div class="bb-topbar">
+            <div class="bb-topbar-inner">
+                @if($topOffer !== '')
+                    <p class="bb-topbar-offer">@include('website.partials.bb-icon', ['name' => 'sparkle']) {{ $topOffer }}</p>
+                @endif
+                @if($topLinks->isNotEmpty())
+                    <nav class="bb-topbar-links" aria-label="Top links">
+                        @foreach($topLinks as $link)
+                            <a href="{{ $link->url }}">{{ $link->label }}</a>
+                        @endforeach
+                    </nav>
+                @endif
+            </div>
+        </div>
+    @endif
     <div class="gaget-floatbar-shell">
         <div class="gaget-floatbar">
             {{-- Brand --}}
@@ -204,7 +226,9 @@
                             </div>
                         </div>
 
-                        <a href="{{ route('website.page', 'about-us') }}" class="gaget-nav-link {{ request()->is('page/about-us') ? 'is-active' : '' }}">About Us</a>
+                        @if($hasAboutPage)
+                            <a href="{{ route('website.page', 'about-us') }}" class="gaget-nav-link {{ request()->is('page/about-us') ? 'is-active' : '' }}">About Us</a>
+                        @endif
                         <a href="{{ route('website.blogs') }}" class="gaget-nav-link {{ request()->routeIs('website.blogs*') ? 'is-active' : '' }}">Blog</a>
                         <a href="{{ route('website.contact') }}" class="gaget-nav-link {{ request()->routeIs('website.contact') ? 'is-active' : '' }}">Contact</a>
                     @endforelse
@@ -380,6 +404,14 @@
                                     <a href="{{ route('website.account') }}" class="gaget-account-menu__item">
                                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                                         Profile
+                                    </a>
+                                    @php $headerUnread = auth('web')->user()->unreadNotifications()->count(); @endphp
+                                    <a href="{{ route('website.account') }}#notifications" class="gaget-account-menu__item">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 11-6 0"/></svg>
+                                        Notifications
+                                        @if($headerUnread > 0)
+                                            <span style="margin-left:auto;background:#f43f5e;color:#fff;border-radius:9999px;padding:0 6px;font-size:10px;font-weight:700;">{{ $headerUnread }}</span>
+                                        @endif
                                     </a>
                                     <button type="button"
                                             class="gaget-account-menu__item gaget-account-menu__item--danger"
@@ -595,7 +627,9 @@
                 </div>
             @endif
 
-            <a href="{{ route('website.page', 'about-us') }}" class="gaget-mobile-drawer-link" @click="mobileOpen = false">About Us</a>
+            @if($hasAboutPage)
+                <a href="{{ route('website.page', 'about-us') }}" class="gaget-mobile-drawer-link" @click="mobileOpen = false">About Us</a>
+            @endif
             <a href="{{ route('website.blogs') }}" class="gaget-mobile-drawer-link" @click="mobileOpen = false">Blog</a>
             <a href="{{ route('website.contact') }}" class="gaget-mobile-drawer-link" @click="mobileOpen = false">Contact</a>
             @endforelse

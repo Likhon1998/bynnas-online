@@ -87,7 +87,8 @@ class StaffNotifier
         return DatabaseNotification::query()
             ->where('type', StaffAlert::class)
             ->where('data', 'like', '%"ref":'.json_encode($ref).'%')
-            ->where('data', 'like', '%"shop_id":'.$shopId.'%')
+            ->where(fn ($q) => $q->where('data', 'like', '%"shop_id":'.$shopId.',%')
+                ->orWhere('data', 'like', '%"shop_id":'.$shopId.'}%'))
             ->when($since, fn ($q) => $q->where('created_at', '>=', $since))
             ->when($unreadOnly, fn ($q) => $q->whereNull('read_at'))
             ->exists();

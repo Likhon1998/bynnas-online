@@ -17,7 +17,7 @@
         <div class="flex flex-wrap items-center gap-2">
             <button type="button" onclick="window.open('{{ route('orders.invoice', $order->id) }}', 'ReceiptWindow', 'width=400,height=620')"
                     class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[12px] font-bold text-indigo-700 hover:bg-indigo-600 hover:text-white">
-                Print receipt
+                Print invoice
             </button>
         </div>
     </div>
@@ -169,8 +169,14 @@
                         </div>
                         @if(($order->confirmation_charge ?? 0) > 0)
                             <div class="flex justify-between gap-3">
-                                <dt class="text-slate-500">Confirmation (in shop)</dt>
+                                <dt class="text-slate-500">Confirmation (store keeps)</dt>
                                 <dd class="font-semibold text-emerald-700">{{ format_taka((float) $order->confirmation_charge, 'Tk ') }}</dd>
+                            </div>
+                        @endif
+                        @if(filled($order->payment_reference))
+                            <div class="flex justify-between gap-3">
+                                <dt class="text-slate-500" title="Check this against your bKash/Nagad statement before confirming">Transaction ID</dt>
+                                <dd class="font-mono text-[12px] font-bold text-slate-900 select-all">{{ $order->payment_reference }}</dd>
                             </div>
                         @endif
                         <div class="flex justify-between gap-3 border-t border-slate-100 pt-2">
@@ -229,6 +235,12 @@
                                     <p class="text-[13px] font-bold text-slate-900">{{ $log->label }}</p>
                                     <p class="text-[11px] text-slate-400">{{ $log->created_at->format('d M Y, h:i A') }}</p>
                                 </div>
+                                @if($log->from_status || $log->changedBy)
+                                    <p class="text-[11px] text-slate-400">
+                                        @if($log->from_status){{ \App\Support\OrderStatus::label($log->from_status) }} → {{ \App\Support\OrderStatus::label($log->status) }}@endif
+                                        @if($log->changedBy) · by {{ $log->changedBy->name }}@endif
+                                    </p>
+                                @endif
                                 @if($log->note)
                                     <p class="mt-0.5 text-[12px] text-slate-600">{{ $log->note }}</p>
                                 @endif

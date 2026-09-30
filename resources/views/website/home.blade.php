@@ -1,22 +1,25 @@
 @extends('website.layout')
 @php
     $ws = app(\App\Services\WebsiteService::class);
-    $homeCopy = data_get($settings, 'home_copy') ?: [];
     $storeName = $settings->store_name ?? config('app.name', 'Bynnas Social');
+    $homeCopy = collect(data_get($settings, 'home_copy') ?: [])
+        ->map(fn ($v) => is_string($v) ? str_replace('{store}', $storeName, $v) : $v)
+        ->all();
 @endphp
 
 @section('content')
 
 {{-- Hero: headline + CTAs + trust badges, CMS slide photos rotate in the rounded media panel --}}
 @php
-    $heroTitle = $homeCopy['hero_title'] ?? 'Little Things, Big Joys';
-    $heroSubtitle = $homeCopy['hero_subtitle'] ?? 'Thoughtfully chosen essentials for every precious moment.';
-    $heroBadge = $homeCopy['hero_badge'] ?? 'For Every Little Adventure';
+    $heroTitle = $homeCopy['hero_title'] ?? '';
+    $heroSubtitle = $homeCopy['hero_subtitle'] ?? '';
+    $heroBadge = $homeCopy['hero_badge'] ?? '';
     $heroTrust = [
-        ['lottie' => 'sparkles', 'title' => $homeCopy['hero_trust_1_title'] ?? 'Gentle Picks', 'sub' => $homeCopy['hero_trust_1_sub'] ?? 'Chosen for little ones'],
-        ['lottie' => 'check', 'title' => $homeCopy['hero_trust_2_title'] ?? 'Genuine Products', 'sub' => $homeCopy['hero_trust_2_sub'] ?? 'From trusted brands'],
-        ['lottie' => 'heart', 'title' => $homeCopy['hero_trust_3_title'] ?? 'Made with Love', 'sub' => $homeCopy['hero_trust_3_sub'] ?? 'For happy families'],
+        ['lottie' => 'sparkles', 'title' => $homeCopy['hero_trust_1_title'] ?? '', 'sub' => $homeCopy['hero_trust_1_sub'] ?? ''],
+        ['lottie' => 'check', 'title' => $homeCopy['hero_trust_2_title'] ?? '', 'sub' => $homeCopy['hero_trust_2_sub'] ?? ''],
+        ['lottie' => 'heart', 'title' => $homeCopy['hero_trust_3_title'] ?? '', 'sub' => $homeCopy['hero_trust_3_sub'] ?? ''],
     ];
+    $heroTrust = array_values(array_filter($heroTrust, fn ($t) => filled($t['title'])));
     $heroImages = $heroSlides->filter(fn ($s) => filled($s->image_path))->map(function ($slide) {
         $src = public_storage_url($slide->image_path);
         $full = public_storage_path($slide->image_path);
@@ -28,14 +31,6 @@
             'cta' => $slide->button_text ?: 'Shop now',
         ];
     })->values();
-    if ($heroImages->isEmpty()) {
-        $heroImages = collect([(object) [
-            'src' => 'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=1400&q=80',
-            'title' => $heroTitle,
-            'url' => route('website.shop'),
-            'cta' => 'Shop now',
-        ]]);
-    }
 @endphp
 <section class="bb-hero">
         <div class="bb-hero-panel"
@@ -73,6 +68,7 @@
                         </a>
                         <a href="{{ route('website.shop', ['filter' => 'new']) }}" class="bb-btn bb-btn--ghost">Explore Collection</a>
                     </div>
+                    @if($heroTrust)
                     <ul class="bb-hero-trust">
                         @foreach($heroTrust as $trust)
                             <li>
@@ -84,12 +80,15 @@
                             </li>
                         @endforeach
                     </ul>
+                    @endif
                 </div>
 
+                @if(filled($heroBadge))
                 <span class="bb-hero-badge" aria-hidden="true">
                     <span class="bb-hero-badge-peek">@include('website.partials.lottie', ['name' => 'chick'])</span>
                     <span>{{ $heroBadge }}</span>
                 </span>
+                @endif
             </div>
 
             @if($heroImages->count() > 1)
@@ -107,18 +106,31 @@
         </div>
 </section>
 
+{{-- Hero side cards (CMS → Landing Page → Hero side cards) --}}
+@if(($heroSideCards ?? collect())->isNotEmpty())
+<section class="bb-section bb-hero-cards">
+    <div class="tn-container">
+        <div class="bb-promo-pair">
+            @foreach($heroSideCards as $banner)
+                @include('website.partials.promo-card', ['banner' => $banner, 'variant' => 'is-wide'])
+            @endforeach
+        </div>
+    </div>
+</section>
+@endif
+
 {{-- Shop by Categories --}}
 @if($categories->isNotEmpty())
 @php
-    $catFallback = 'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=600&q=80';
+    $catFallback = $ws->placeholderImageUrl();
     $catTints = ['is-peach', 'is-lavender', 'is-sage', 'is-butter', 'is-rose', 'is-sky'];
 @endphp
 <section class="bb-section bb-cats">
     <div class="tn-container">
         <header class="bb-head">
             <span class="bb-head-mark">@include('website.partials.lottie', ['name' => 'rainbow'])</span>
-            <h2 class="bb-head-title">{{ $homeCopy['categories_title'] ?? 'Shop by' }} {{ $homeCopy['categories_title_accent'] ?? 'Categories' }}</h2>
-            <p class="bb-head-sub">{{ $homeCopy['categories_subtitle'] ?? 'Everything your little one needs, all in one place.' }}</p>
+            <h2 class="bb-head-title">{{ $homeCopy['categories_title'] ?? '' }} {{ $homeCopy['categories_title_accent'] ?? '' }}</h2>
+            <p class="bb-head-sub">{{ $homeCopy['categories_subtitle'] ?? '' }}</p>
         </header>
         <div class="bb-cat-grid">
             @foreach($categories->take(6) as $i => $category)
@@ -151,8 +163,8 @@
                 <div class="bb-flash-title">
                     <span class="bb-flash-fire">@include('website.partials.lottie', ['name' => 'fire'])</span>
                     <div>
-                        <h2 class="bb-flash-heading">{{ $homeCopy['flash_title'] ?? 'Flash' }} {{ $homeCopy['flash_title_accent'] ?? 'Sale' }}</h2>
-                        <p class="bb-flash-sub">{{ $homeCopy['flash_subtitle'] ?? 'Hurry! Sweet prices on little favourites.' }}</p>
+                        <h2 class="bb-flash-heading">{{ $homeCopy['flash_title'] ?? '' }} {{ $homeCopy['flash_title_accent'] ?? '' }}</h2>
+                        <p class="bb-flash-sub">{{ $homeCopy['flash_subtitle'] ?? '' }}</p>
                     </div>
                 </div>
                 @if($flashSaleEndsAt)
@@ -205,14 +217,36 @@
 </section>
 @endif
 
-{{-- Featured Products (best sellers) --}}
-@if(($bestSellers ?? collect())->isNotEmpty())
+{{-- Deal banners (CMS → Landing Page → Promo banners + deals heading) --}}
+@if(($promoBanners ?? collect())->isNotEmpty())
+<section class="bb-section bb-deals">
+    <div class="tn-container">
+        <header class="bb-head">
+            @if(filled($settings->deals_kicker ?? null))
+                <span class="bb-head-kicker">{{ $settings->deals_kicker }}</span>
+            @endif
+            <h2 class="bb-head-title">{{ $settings->deals_title }} <span class="bb-head-accent">{{ $settings->deals_title_accent }}</span></h2>
+            @if(filled($settings->deals_subtitle ?? null))
+                <p class="bb-head-sub">{{ $settings->deals_subtitle }}</p>
+            @endif
+        </header>
+        <div class="bb-promo-grid" style="--bb-promo-count: {{ min(4, $promoBanners->count()) }}">
+            @foreach($promoBanners as $banner)
+                @include('website.partials.promo-card', ['banner' => $banner])
+            @endforeach
+        </div>
+    </div>
+</section>
+@endif
+
+{{-- Featured Products (admin "Featured on homepage"; best sellers until any are ticked) --}}
+@if(($featuredProducts ?? collect())->isNotEmpty())
 <section class="bb-section bb-featured">
     <div class="tn-container">
         <header class="bb-head">
             <span class="bb-head-mark">@include('website.partials.lottie', ['name' => 'star'])</span>
-            <h2 class="bb-head-title">{{ $homeCopy['featured_title'] ?? 'Featured Products' }}</h2>
-            <p class="bb-head-sub">{{ $homeCopy['featured_subtitle'] ?? 'Our most loved picks, chosen by families like yours.' }}</p>
+            <h2 class="bb-head-title">{{ $homeCopy['featured_title'] ?? '' }}</h2>
+            <p class="bb-head-sub">{{ $homeCopy['featured_subtitle'] ?? '' }}</p>
         </header>
         <div class="bb-rail-wrap" x-data="{
                 over: false,
@@ -222,7 +256,7 @@
              x-init="$nextTick(() => check()); window.addEventListener('resize', () => check())">
             <button type="button" x-show="over" x-cloak class="bb-rail-arrow is-prev" @click="scroll(-1)" aria-label="Previous products">@include('website.partials.bb-icon', ['name' => 'chevron-left'])</button>
             <div class="bb-rail" x-ref="rail">
-                @foreach($bestSellers as $product)
+                @foreach($featuredProducts as $product)
                     <div class="bb-rail-item">@include('website.partials.tn-product-card', ['product' => $product])</div>
                 @endforeach
             </div>
@@ -239,8 +273,8 @@
         <div class="bb-combo-panel">
             <header class="bb-head">
                 <span class="bb-head-mark">@include('website.partials.lottie', ['name' => 'gift'])</span>
-                <h2 class="bb-head-title">{{ $homeCopy['combo_title'] ?? 'Combo Deals' }}</h2>
-                <p class="bb-head-sub">{{ $homeCopy['combo_subtitle'] ?? 'Handy bundles that save you more — perfect for gifting too!' }}</p>
+                <h2 class="bb-head-title">{{ $homeCopy['combo_title'] ?? '' }}</h2>
+                <p class="bb-head-sub">{{ $homeCopy['combo_subtitle'] ?? '' }}</p>
             </header>
             <div class="bb-product-grid bb-product-grid--combo" style="--bb-grid-count: {{ $comboProducts->count() }}">
                 @foreach($comboProducts as $product)
@@ -257,12 +291,32 @@
 </section>
 @endif
 
+{{-- Mid promo strip (CMS → Landing Page → Mid promo banner) --}}
+@if(($midPromoBanners ?? collect())->isNotEmpty())
+<section class="bb-section bb-mid-promo">
+    <div class="tn-container">
+        <div class="bb-rail-wrap" x-data="{
+                over: false,
+                check() { const r = this.$refs.rail; this.over = r.scrollWidth > r.clientWidth + 4; },
+                scroll(d) { const r = this.$refs.rail; r.scrollBy({ left: d * r.clientWidth * 0.8, behavior: 'smooth' }); }
+             }"
+             x-init="$nextTick(() => check()); window.addEventListener('resize', () => check())">
+            <button type="button" x-show="over" x-cloak class="bb-rail-arrow is-prev" @click="scroll(-1)" aria-label="Previous offers">@include('website.partials.bb-icon', ['name' => 'chevron-left'])</button>
+            <div class="bb-promo-rail" x-ref="rail">
+                @foreach($midPromoBanners as $banner)
+                    @include('website.partials.promo-card', ['banner' => $banner, 'variant' => 'is-wide'])
+                @endforeach
+            </div>
+            <button type="button" x-show="over" x-cloak class="bb-rail-arrow is-next" @click="scroll(1)" aria-label="Next offers">@include('website.partials.bb-icon', ['name' => 'chevron-right'])</button>
+        </div>
+    </div>
+</section>
+@endif
+
 {{-- Why choose us (CMS → Landing Page features) --}}
 @if($features->isNotEmpty())
 @php
-    $babyCategory = $categories->first(fn ($c) => str_contains(strtolower(($c->slug ?? '').' '.$c->name), 'baby'));
-    $whyImage = ($babyCategory ? $ws->categoryImageUrl($babyCategory) : null)
-        ?: 'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=1000&q=80';
+    $whyImage = $categories->map(fn ($c) => $ws->categoryImageUrl($c))->filter()->first();
     $whyLottie = [
         'truck' => 'rocket', 'shipping' => 'rocket', 'return' => 'package', 'lock' => 'lock',
         'shield' => 'check', 'warranty' => 'check', 'payment' => 'money', 'support' => 'hug', 'chat' => 'hug',
@@ -273,8 +327,8 @@
         <div class="bb-why">
             <div class="bb-why-copy">
                 <span class="bb-head-mark bb-why-mark">@include('website.partials.lottie', ['name' => 'hug'])</span>
-                <h2 class="bb-head-title">{{ $homeCopy['why_title'] ?? 'Why Parents Choose '.$storeName }}</h2>
-                <p class="bb-head-sub">{{ $homeCopy['why_subtitle'] ?? 'Because your little one deserves the very best.' }}</p>
+                <h2 class="bb-head-title">{{ $homeCopy['why_title'] ?? '' }}</h2>
+                <p class="bb-head-sub">{{ $homeCopy['why_subtitle'] ?? '' }}</p>
                 <div class="bb-why-grid">
                     @foreach($features as $feature)
                         <div class="bb-why-item">
@@ -286,15 +340,22 @@
                         </div>
                     @endforeach
                 </div>
+                @if(filled($settings->trusted_by_text ?? null))
+                    <p class="bb-why-trusted">@include('website.partials.bb-icon', ['name' => 'shield']) {{ $settings->trusted_by_text }}</p>
+                @endif
             </div>
+            @if($whyImage)
             <div class="bb-why-media">
                 <img src="{{ $whyImage }}" alt="" class="bb-fill" loading="lazy" decoding="async">
+                @if(filled($homeCopy['why_badge'] ?? null))
                 <span class="bb-why-badge" aria-hidden="true">
                     <span class="bb-why-badge-peek">@include('website.partials.lottie', ['name' => 'purple-heart'])</span>
-                    <span>{{ $homeCopy['why_badge'] ?? 'Quality You Can Trust' }}</span>
+                    <span>{{ $homeCopy['why_badge'] }}</span>
                 </span>
+                @endif
                 <span class="bb-why-kite">@include('website.partials.lottie', ['name' => 'kite'])</span>
             </div>
+            @endif
         </div>
     </div>
 </section>
@@ -306,8 +367,8 @@
     <div class="tn-container">
         <header class="bb-head">
             <span class="bb-head-mark">@include('website.partials.lottie', ['name' => 'hatching-chick'])</span>
-            <h2 class="bb-head-title">{{ $homeCopy['new_title'] ?? 'New' }} {{ $homeCopy['new_title_accent'] ?? 'Arrivals' }}</h2>
-            <p class="bb-head-sub">{{ $homeCopy['new_subtitle'] ?? 'Freshly hatched goodies, just landed in our nest.' }}</p>
+            <h2 class="bb-head-title">{{ $homeCopy['new_title'] ?? '' }} {{ $homeCopy['new_title_accent'] ?? '' }}</h2>
+            <p class="bb-head-sub">{{ $homeCopy['new_subtitle'] ?? '' }}</p>
         </header>
         <div class="bb-product-grid">
             @foreach($newArrivals as $product)
@@ -316,6 +377,33 @@
         </div>
         <div class="bb-section-cta">
             <a href="{{ route('website.shop', ['filter' => 'new']) }}" class="bb-btn bb-btn--ghost">See all new arrivals</a>
+        </div>
+    </div>
+</section>
+@endif
+
+{{-- Brands (Products → Brands; target of the "Brands" menu link) --}}
+@php $homeBrands = ($brands ?? collect())->filter(fn ($b) => (int) ($b->products_count ?? 0) > 0)->take(12)->values(); @endphp
+@if($homeBrands->isNotEmpty())
+<section class="bb-section bb-brands" id="brands">
+    <div class="tn-container">
+        <header class="bb-head">
+            <span class="bb-head-mark">@include('website.partials.lottie', ['name' => 'sparkles'])</span>
+            <h2 class="bb-head-title">{{ $homeCopy['brands_title'] ?? '' }} {{ $homeCopy['brands_title_accent'] ?? '' }}</h2>
+            <p class="bb-head-sub">{{ $homeCopy['brands_subtitle'] ?? '' }}</p>
+        </header>
+        <div class="bb-brand-grid">
+            @foreach($homeBrands as $brand)
+                <a href="{{ route('website.brand', \Illuminate\Support\Str::slug($brand->name)) }}" class="bb-brand-chip">
+                    @if($brand->logo_path)
+                        <img src="{{ public_storage_url($brand->logo_path) }}" alt="{{ $brand->name }}" loading="lazy" decoding="async">
+                    @else
+                        <span class="bb-brand-letter" aria-hidden="true">{{ strtoupper(mb_substr($brand->name, 0, 1)) }}</span>
+                    @endif
+                    <span class="bb-brand-name">{{ $brand->name }}</span>
+                    <span class="bb-brand-count">{{ $brand->products_count }} {{ \Illuminate\Support\Str::plural('item', (int) $brand->products_count) }}</span>
+                </a>
+            @endforeach
         </div>
     </div>
 </section>
@@ -338,8 +426,8 @@
     <div class="tn-container">
         <header class="bb-head">
             <span class="bb-head-mark">@include('website.partials.lottie', ['name' => 'hearts-face'])</span>
-            <h2 class="bb-head-title">{{ $homeCopy['reviews_title'] ?? 'Loved by Parents' }}</h2>
-            <p class="bb-head-sub">{{ $homeCopy['reviews_subtitle'] ?? 'Real stories from our happy '.$storeName.' family.' }}</p>
+            <h2 class="bb-head-title">{{ $homeCopy['reviews_title'] ?? '' }}</h2>
+            <p class="bb-head-sub">{{ $homeCopy['reviews_subtitle'] ?? '' }}</p>
         </header>
         <div class="bb-review-viewport">
             <div class="bb-review-track" :style="'transform: translateX(-' + (page * 100) + '%)'">
@@ -380,6 +468,38 @@
                 @endforeach
             </div>
         @endif
+    </div>
+</section>
+@endif
+
+{{-- Latest blog posts (CMS → Blogs) --}}
+@if(($latestBlogs ?? collect())->isNotEmpty())
+<section class="bb-section bb-blog">
+    <div class="tn-container">
+        <header class="bb-head">
+            <span class="bb-head-mark">@include('website.partials.lottie', ['name' => 'rainbow'])</span>
+            <h2 class="bb-head-title">{{ $homeCopy['blog_title'] ?? '' }} {{ $homeCopy['blog_title_accent'] ?? '' }}</h2>
+            <p class="bb-head-sub">{{ $homeCopy['blog_subtitle'] ?? '' }}</p>
+        </header>
+        <div class="bb-blog-grid">
+            @foreach($latestBlogs as $post)
+                <a href="{{ route('website.blog', $post->slug) }}" class="bb-blog-card">
+                    <span class="bb-blog-media"><img src="{{ $post->coverUrl() }}" alt="" class="bb-fill" loading="lazy" decoding="async"></span>
+                    <span class="bb-blog-body">
+                        <span class="bb-blog-meta">
+                            @if($post->category){{ $post->category->name }} · @endif{{ optional($post->published_at)->format('M d, Y') }}
+                        </span>
+                        <span class="bb-blog-title">{{ $post->title }}</span>
+                        @if($post->excerpt)
+                            <span class="bb-blog-excerpt">{{ \Illuminate\Support\Str::limit(strip_tags($post->excerpt), 110) }}</span>
+                        @endif
+                    </span>
+                </a>
+            @endforeach
+        </div>
+        <div class="bb-section-cta">
+            <a href="{{ route('website.blogs') }}" class="bb-btn bb-btn--ghost">Read the blog</a>
+        </div>
     </div>
 </section>
 @endif

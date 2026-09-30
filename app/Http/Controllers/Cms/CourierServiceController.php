@@ -14,7 +14,7 @@ class CourierServiceController extends Controller
 
     public function index()
     {
-        $this->seedDefaultsIfEmpty();
+        CourierService::ensureDefaults($this->shopId());
 
         $services = CourierService::forShop($this->shopId())
             ->orderBy('sort_order')
@@ -22,27 +22,6 @@ class CourierServiceController extends Controller
             ->get();
 
         return view('cms.couriers.index', compact('services'));
-    }
-
-    private function seedDefaultsIfEmpty(): void
-    {
-        if (CourierService::forShop($this->shopId())->exists()) {
-            return;
-        }
-
-        foreach ([
-            ['name' => 'Pathao', 'sort_order' => 1],
-            ['name' => 'Steadfast', 'sort_order' => 2],
-            ['name' => 'RedX', 'sort_order' => 3],
-            ['name' => 'Paperfly', 'sort_order' => 4],
-        ] as $row) {
-            CourierService::create([
-                'shop_id' => $this->shopId(),
-                'name' => $row['name'],
-                'sort_order' => $row['sort_order'],
-                'is_active' => true,
-            ]);
-        }
     }
 
     public function store(Request $request)

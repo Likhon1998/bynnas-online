@@ -680,12 +680,12 @@
                 <label class="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                     <input type="checkbox" name="is_best_seller" value="1" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                            @checked(old('is_best_seller', $prefill?->is_best_seller ?? false))>
-                    Trending
+                    Best seller
                 </label>
-                <label class="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <label class="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer" title="Shown in the homepage Featured Products section">
                     <input type="checkbox" name="is_featured" value="1" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                            @checked(old('is_featured', $prefill?->is_featured ?? false))>
-                    Featured
+                    Featured on homepage
                 </label>
             </div>
 

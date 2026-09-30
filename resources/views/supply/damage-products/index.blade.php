@@ -1,6 +1,6 @@
 <x-supply-layout
     title="Damage Product"
-    subtitle="Write off damaged or expired stock so POS and the web store stay accurate."
+    :subtitle="'Write off damaged or expired stock so ' . (retail_enabled() ? 'POS and ' : '') . 'the web store stay' . (retail_enabled() ? '' : 's') . ' accurate.'"
 >
     @php
         $productOptions = $products->map(fn ($p) => [

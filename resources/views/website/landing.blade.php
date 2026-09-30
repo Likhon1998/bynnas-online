@@ -299,6 +299,18 @@
                     @else
                         <input type="hidden" name="payment_method" :value="payment">
                     @endif
+                    @if(($deliveryConfig['confirmation_enabled'] ?? false) && ($deliveryConfig['confirmation_amount'] ?? 0) > 0)
+                        <div x-show="payment === 'confirmation_charge'" x-cloak class="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-3 space-y-2">
+                            @if(filled($deliveryConfig['confirmation_instructions'] ?? null))
+                                <p class="text-[13px] leading-relaxed text-slate-700 whitespace-pre-line">{{ $deliveryConfig['confirmation_instructions'] }}</p>
+                            @endif
+                            <label for="lp-trx" class="block text-[12px] font-bold uppercase tracking-wide text-slate-500">Transaction ID <span class="text-rose-500">*</span></label>
+                            <input id="lp-trx" type="text" name="payment_reference" value="{{ old('payment_reference') }}" maxlength="100" autocomplete="off"
+                                   :required="payment === 'confirmation_charge'" :disabled="payment !== 'confirmation_charge'"
+                                   placeholder="e.g. 9A7B6C5D4E" class="lp-accent-ring w-full rounded-xl border-slate-200 bg-white px-3 py-3 text-[15px]">
+                            @error('payment_reference')<p class="text-[12px] font-semibold text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                    @endif
                     <div>
                         <label for="lp-note" class="block text-[12px] font-bold uppercase tracking-wide text-slate-500">Note (optional)</label>
                         <input id="lp-note" type="text" name="note" value="{{ old('note') }}" maxlength="500" placeholder="Size, colour or delivery instructions" class="lp-accent-ring mt-1 w-full rounded-xl border-slate-200 px-3 py-3 text-[15px]">

@@ -5,9 +5,9 @@
     $heroTitle = data_get($settings, 'contact_hero_title') ?: "We're Here to Help!";
     $heroSub = data_get($settings, 'contact_hero_subtitle')
         ?: 'Have a question about an order, product, or return? Our support team is ready to assist you.';
-    $email = data_get($settings, 'contact_email') ?: 'support@bynnas.com';
-    $phone = data_get($settings, 'contact_phone') ?: '+880 1712-345678';
-    $address = data_get($settings, 'contact_address') ?: 'Gulshan 1, Dhaka 1212, Bangladesh';
+    $email = trim((string) data_get($settings, 'contact_email'));
+    $phone = trim((string) data_get($settings, 'contact_phone'));
+    $address = trim((string) data_get($settings, 'contact_address'));
     $website = data_get($settings, 'contact_website_url') ?: url('/');
     $websiteLabel = preg_replace('#^https?://#', '', rtrim($website, '/'));
     $mapEmbed = normalize_map_embed_url(data_get($settings, 'contact_map_embed'));
@@ -49,30 +49,40 @@
             <p class="mt-1 text-xs text-slate-500 leading-relaxed">{{ data_get($settings, 'contact_chat_text') ?: 'Send a message through the contact form below.' }}</p>
             <p class="mt-2 text-xs font-semibold text-blue-600">{{ data_get($settings, 'contact_chat_status') ?: 'Use the form below' }}</p>
         </a>
+        @if($email !== '')
         <div class="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
             <div class="w-11 h-11 rounded-xl bg-violet-50 text-violet-600 inline-flex items-center justify-center">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
             </div>
-            <h3 class="mt-3 text-sm font-bold text-slate-900">{{ data_get($settings, 'contact_email_card_title') ?: 'Email Support' }}</h3>
-            <p class="mt-1 text-xs text-slate-500 leading-relaxed">{{ data_get($settings, 'contact_email_card_text') ?: "Send us an email anytime. We'll get back to you." }}</p>
+            <h3 class="mt-3 text-sm font-bold text-slate-900">{{ data_get($settings, 'contact_email_card_title') ?: 'Email Us' }}</h3>
+            @if(filled(data_get($settings, 'contact_email_card_text')))
+                <p class="mt-1 text-xs text-slate-500 leading-relaxed">{{ data_get($settings, 'contact_email_card_text') }}</p>
+            @endif
             <a href="mailto:{{ $email }}" class="mt-2 block text-xs font-semibold text-blue-600 break-all">{{ $email }}</a>
         </div>
+        @endif
+        @if($phone !== '')
         <div class="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
             <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 inline-flex items-center justify-center">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
             </div>
             <h3 class="mt-3 text-sm font-bold text-slate-900">{{ data_get($settings, 'contact_phone_card_title') ?: 'Call Us' }}</h3>
-            <p class="mt-1 text-xs text-slate-500 leading-relaxed">{{ data_get($settings, 'contact_phone_card_text') ?: 'Speak with our experts directly.' }}</p>
-            <a href="tel:{{ preg_replace('/\s+/', '', $phone) }}" class="mt-2 block text-xs font-semibold text-blue-600">{{ $phone }}</a>
+            @if(filled(data_get($settings, 'contact_phone_card_text')))
+                <p class="mt-1 text-xs text-slate-500 leading-relaxed">{{ data_get($settings, 'contact_phone_card_text') }}</p>
+            @endif
+            <a href="tel:{{ preg_replace('/[^0-9+]/', '', $phone) }}" class="mt-2 block text-xs font-semibold text-blue-600">{{ $phone }}</a>
         </div>
+        @endif
+        @if(filled(data_get($settings, 'contact_hours_weekday')) || filled(data_get($settings, 'contact_hours_weekend')))
         <div class="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
             <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 inline-flex items-center justify-center">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
             <h3 class="mt-3 text-sm font-bold text-slate-900">{{ data_get($settings, 'contact_hours_title') ?: 'Working Hours' }}</h3>
-            <p class="mt-1 text-xs text-slate-600">{{ data_get($settings, 'contact_hours_weekday') ?: 'Sat - Thu: 10:00 AM - 8:00 PM (BDT)' }}</p>
-            <p class="mt-0.5 text-xs text-slate-500">{{ data_get($settings, 'contact_hours_weekend') ?: 'Fri: 3:00 PM - 8:00 PM (BDT)' }}</p>
+            <p class="mt-1 text-xs text-slate-600">{{ data_get($settings, 'contact_hours_weekday') }}</p>
+            <p class="mt-0.5 text-xs text-slate-500">{{ data_get($settings, 'contact_hours_weekend') }}</p>
         </div>
+        @endif
     </div>
 </div>
 
@@ -131,12 +141,15 @@
                         <div class="text-center px-4">
                             <svg class="w-10 h-10 mx-auto text-blue-500 mb-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg>
                             <p class="font-semibold text-slate-600">{{ $settings->store_name ?? config('app.name', 'Bynnas Social') }}</p>
-                            <p class="text-xs mt-1">Add a map embed URL in CMS → Contact</p>
+                            @if(filled($settings->contact_address ?? null))
+                                <p class="text-xs mt-1">{{ $settings->contact_address }}</p>
+                            @endif
                         </div>
                     </div>
                 @endif
             </div>
             <div class="rounded-2xl border border-slate-100 bg-white shadow-sm p-5 space-y-4">
+                @if($address !== '')
                 <div class="flex gap-3">
                     <span class="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 inline-flex items-center justify-center shrink-0">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -146,15 +159,19 @@
                         <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">{{ $address }}</p>
                     </div>
                 </div>
+                @endif
+                @if($phone !== '')
                 <div class="flex gap-3">
                     <span class="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 inline-flex items-center justify-center shrink-0">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
                     </span>
                     <div>
                         <p class="text-xs font-bold text-slate-900">Phone</p>
-                        <a href="tel:{{ preg_replace('/\s+/', '', $phone) }}" class="text-xs text-slate-500 hover:text-blue-600">{{ $phone }}</a>
+                        <a href="tel:{{ preg_replace('/[^0-9+]/', '', $phone) }}" class="text-xs text-slate-500 hover:text-blue-600">{{ $phone }}</a>
                     </div>
                 </div>
+                @endif
+                @if($email !== '')
                 <div class="flex gap-3">
                     <span class="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 inline-flex items-center justify-center shrink-0">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
@@ -164,6 +181,7 @@
                         <a href="mailto:{{ $email }}" class="text-xs text-slate-500 hover:text-blue-600 break-all">{{ $email }}</a>
                     </div>
                 </div>
+                @endif
                 <div class="flex gap-3">
                     <span class="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 inline-flex items-center justify-center shrink-0">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
@@ -193,12 +211,10 @@
             <p class="text-xs text-emerald-600">{{ session('newsletter_success') }}</p>
         @endif
         <div class="flex items-center gap-2 lg:ml-auto">
-            @foreach(['facebook' => 'M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z', 'twitter' => 'M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z', 'instagram' => 'M7 2h10a5 5 0 015 5v10a5 5 0 01-5 5H7a5 5 0 01-5-5V7a5 5 0 015-5zm5 5a5 5 0 100 10 5 5 0 000-10zm6.5-.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z', 'youtube' => 'M22.54 6.42a2.78 2.78 0 00-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 00-1.94 2A29 29 0 001 12a29 29 0 00.46 5.58A2.78 2.78 0 003.4 19.6C5.12 20 12 20 12 20s6.88 0 8.6-.46a2.78 2.78 0 001.94-2A29 29 0 0023 12a29 29 0 00-.46-5.58zM9.75 15.02V8.98L15.5 12l-5.75 3.02z'] as $net => $path)
-                @if(!empty($social[$net]))
-                    <a href="{{ $social[$net] }}" target="_blank" rel="noopener" class="w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:border-blue-200 inline-flex items-center justify-center" aria-label="{{ ucfirst($net) }}">
-                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="{{ $path }}"/></svg>
-                    </a>
-                @endif
+            @foreach(\App\Models\SiteSetting::socialProfiles($social ?? []) as $profile)
+                <a href="{{ $profile['url'] }}" target="_blank" rel="noopener" class="w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:border-blue-200 inline-flex items-center justify-center" aria-label="{{ $profile['label'] }}">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="{{ $profile['path'] }}"/></svg>
+                </a>
             @endforeach
         </div>
     </div>

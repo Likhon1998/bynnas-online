@@ -52,10 +52,8 @@ class ContactController extends Controller
             'contact_map_embed' => 'nullable|string|max:8000',
             'contact_newsletter_title' => 'nullable|string|max:160',
             'contact_newsletter_text' => 'nullable|string|max:255',
-            'social_facebook' => 'nullable|string|max:255',
-            'social_twitter' => 'nullable|string|max:255',
-            'social_instagram' => 'nullable|string|max:255',
-            'social_youtube' => 'nullable|string|max:255',
+            'social' => 'nullable|array',
+            'social.*' => 'nullable|string|max:255',
         ]);
 
         $settings = SiteSetting::query()->first();
@@ -91,12 +89,11 @@ class ContactController extends Controller
             $settings->contact_map_embed = $raw ? (normalize_map_embed_url($raw) ?: $raw) : null;
         }
 
-        $settings->social_links = array_filter([
-            'facebook' => $data['social_facebook'] ?? null,
-            'twitter' => $data['social_twitter'] ?? null,
-            'instagram' => $data['social_instagram'] ?? null,
-            'youtube' => $data['social_youtube'] ?? null,
-        ]);
+        $social = array_intersect_key($data['social'] ?? [], SiteSetting::SOCIAL_NETWORKS);
+        if (isset($social['whatsapp'])) {
+            $social['whatsapp'] = SiteSetting::whatsappUrl($social['whatsapp']);
+        }
+        $settings->social_links = array_filter(array_map(fn ($v) => trim((string) $v), $social));
 
         $settings->save();
 

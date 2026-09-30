@@ -65,17 +65,30 @@
     @hasSection('meta')
         @yield('meta')
     @else
-        @php $defaultMetaDescription = \Illuminate\Support\Str::limit((string) ($settings->footer_tagline ?? ''), 160, '…'); @endphp
+        @php
+            $defaultMetaDescription = \Illuminate\Support\Str::limit(
+                trim(strip_tags($__env->yieldContent('meta_description'))) ?: trim((string) ($settings->footer_tagline ?? '')),
+                160,
+                '…'
+            );
+            $defaultOgImage = trim($__env->yieldContent('og_image'))
+                ?: (! empty($settings->logo_path) ? public_storage_url($settings->logo_path) : '');
+        @endphp
         @if($defaultMetaDescription !== '')
             <meta name="description" content="{{ $defaultMetaDescription }}">
         @endif
-        <meta property="og:type" content="website">
+        <link rel="canonical" href="{{ url()->current() }}">
+        <meta property="og:type" content="@yield('og_type', 'website')">
         <meta property="og:site_name" content="{{ $settings->store_name ?? config('app.name') }}">
         <meta property="og:title" content="@yield('title', $settings->store_name ?? config('app.name', 'Bynnas Social'))">
         <meta property="og:url" content="{{ url()->current() }}">
         @if($defaultMetaDescription !== '')
             <meta property="og:description" content="{{ $defaultMetaDescription }}">
         @endif
+        @if($defaultOgImage !== '')
+            <meta property="og:image" content="{{ $defaultOgImage }}">
+        @endif
+        <meta name="twitter:card" content="{{ $defaultOgImage !== '' ? 'summary_large_image' : 'summary' }}">
     @endif
     @include('partials.favicon', ['settings' => $settings ?? null])
     @php
@@ -96,8 +109,8 @@
                     'default_zone' => 'inside_dhaka',
                     'inside_dhaka' => 60,
                     'outside_dhaka' => 120,
-                    'free_enabled' => true,
-                    'free_min_amount' => 10000,
+                    'free_enabled' => false,
+                    'free_min_amount' => 0,
                     'cod_enabled' => true,
                     'confirmation_enabled' => false,
                     'confirmation_amount' => 0,
@@ -216,6 +229,7 @@
                     address: @json(data_get($storefrontUser, 'address', '')),
                     zone: @json($deliveryConfig['default_zone'] ?? 'inside_dhaka'),
                     payment_method: 'cash_on_delivery',
+                    payment_reference: '',
                 },
                 get deliveryZones() {
                     const zones = (this.deliveryConfig || {}).zones;
@@ -601,6 +615,12 @@
                         this.orderSuccess = false;
                         return;
                     }
+                    const paymentReference = String(this.checkout.payment_reference || '').trim();
+                    if (this.deliveryQuote.paymentMethod === 'confirmation_charge' && paymentReference.length < 4) {
+                        this.orderMessage = 'Enter the Transaction ID of your confirmation payment.';
+                        this.orderSuccess = false;
+                        return;
+                    }
                     if (!this.isLoggedIn) {
                         this.syncCart({ silent: true });
                         this.checkoutStep = 'auth';
@@ -623,6 +643,7 @@
                                 customer_address: address,
                                 delivery_zone: this.deliveryQuote.zone,
                                 payment_method: this.deliveryQuote.paymentMethod,
+                                payment_reference: this.deliveryQuote.paymentMethod === 'confirmation_charge' ? paymentReference : null,
                             }),
                         });
                         const data = await res.json().catch(() => ({}));
@@ -642,6 +663,7 @@
                         if (res.status === 422) {
                             this.orderSuccess = false;
                             this.orderMessage = data.errors?.customer_address?.[0]
+                                || data.errors?.payment_reference?.[0]
                                 || data.errors?.customer_phone?.[0]
                                 || data.errors?.customer_name?.[0]
                                 || data.message
@@ -896,7 +918,7 @@
                         @include('website.partials.lottie', ['name' => 'sleepy'])
                     </div>
                     <p class="gaget-cart-empty__title">Your cart is taking a nap</p>
-                    <p class="gaget-cart-empty__text">Wake it up with some cuddly goodies for your little one!</p>
+                    <p class="gaget-cart-empty__text">Browse the shop and add something you like.</p>
                     <button type="button" class="gaget-btn-primary gaget-cart-empty__cta" @click="closeCart()">Continue shopping</button>
                 </div>
             </template>
@@ -1033,9 +1055,7 @@
                         <span class="text-slate-500">Delivery (<span x-text="deliveryQuote.zoneLabel"></span>)</span>
                         <span class="font-semibold" x-text="deliveryQuote.isFree ? 'FREE' : (currency + Math.round(Number(deliveryQuote.deliveryFee) || 0).toLocaleString())"></span>
                     </div>
-                    <p x-show="deliveryQuote.freeReason" x-text="deliveryQuote.freeReason" class="text-[11px] text-emerald-600 font-medium"></p>
-                    <p x-show="!deliveryQuote.isFree && deliveryQuote.deliveryFee > 0" class="text-[11px] text-slate-500">Delivery is paid to the delivery person.</p>
-                    <div class="flex justify-between border-t border-slate-200 pt-1.5 text-sm">
+                    <p x-show="deliveryQuote.freeReason" x-text="deliveryQuote.freeReason" class="text-[11px] text-emerald-600 font-medium"></p>                    <div class="flex justify-between border-t border-slate-200 pt-1.5 text-sm">
                         <span class="font-bold text-slate-800">Total</span>
                         <span class="font-bold text-slate-900" x-text="currency + Math.round(Number(deliveryQuote.grandTotal) || 0).toLocaleString()"></span>
                     </div>
@@ -1063,6 +1083,14 @@
                                 </span>
                             </span>
                         </label>
+                        <div x-show="deliveryQuote.paymentMethod === 'confirmation_charge'" x-cloak class="rounded-xl border border-orange-200 bg-orange-50/60 px-3 py-2.5 space-y-2">
+                            <p x-show="deliveryConfig.confirmation_instructions" class="text-[11.5px] leading-relaxed text-slate-700 whitespace-pre-line" x-text="deliveryConfig.confirmation_instructions"></p>
+                            <label class="block">
+                                <span class="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Transaction ID <span class="text-rose-500">*</span></span>
+                                <input x-model="checkout.payment_reference" type="text" maxlength="100" autocomplete="off" placeholder="e.g. 9A7B6C5D4E"
+                                       class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -1087,7 +1115,7 @@
                 @include('website.partials.lottie', ['name' => 'party'])
             </div>
             <h3 class="text-xl font-extrabold text-slate-900">Order placed successfully!</h3>
-            <p class="mt-2 text-sm text-slate-500">Thank you — your order is confirmed.</p>
+            <p class="mt-2 text-sm text-slate-500">Thank you — we’ve received your order and will contact you to confirm it.</p>
             <div class="mt-5 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-4 py-4 shadow-sm">
                 <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-700">Your Order ID</p>
                 <p class="mt-1.5 font-mono text-[17px] font-extrabold tracking-wide text-emerald-950" x-text="lastOrderInvoice || ('#' + lastOrderId)"></p>

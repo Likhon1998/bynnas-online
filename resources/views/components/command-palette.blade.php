@@ -21,14 +21,16 @@
 
         // Sales
         $retail && $user->can('view sales ledger') ? ['id' => 'act-sales', 'title' => 'Sales Ledger', 'subtitle' => 'POS & online sales', 'url' => route('sales.index'), 'icon' => 'order', 'keywords' => 'orders invoices'] : null,
-        $user->can('view sales ledger') && $user->isAdminUser() ? ['id' => 'act-online', 'title' => 'Online Orders', 'subtitle' => 'Web checkout queue', 'url' => route('online-orders.index'), 'icon' => 'globe', 'keywords' => 'web pending new arrival online'] : null,
-        $user->can('view sales ledger') || $user->can('process pos sales') ? ['id' => 'act-customers', 'title' => 'Customers', 'subtitle' => 'Customer directory', 'url' => route('customers.index'), 'icon' => 'customer', 'keywords' => 'people phone'] : null,
+        $user->can('manage orders') ? ['id' => 'act-online', 'title' => 'Online Orders', 'subtitle' => 'Web checkout queue', 'url' => route('online-orders.index'), 'icon' => 'globe', 'keywords' => 'web pending new arrival online'] : null,
+        $user->can('manage customers') ? ['id' => 'act-customers', 'title' => 'Customers', 'subtitle' => 'Customer directory', 'url' => route('customers.index'), 'icon' => 'customer', 'keywords' => 'people phone'] : null,
+        $user->can('manage leads') ? ['id' => 'act-leads', 'title' => 'Leads', 'subtitle' => 'Follow-ups & conversions', 'url' => route('leads.index'), 'icon' => 'customer', 'keywords' => 'lead crm follow up'] : null,
+        $user->can('manage leads') ? ['id' => 'act-abandoned', 'title' => 'Abandoned Carts', 'subtitle' => 'Recover lost checkouts', 'url' => route('abandoned-carts.index'), 'icon' => 'order', 'keywords' => 'abandoned cart recovery'] : null,
 
         // Sessions / finance / reports
         $retail ? ['id' => 'act-sessions', 'title' => 'Cash Sessions', 'subtitle' => 'Open / close tills', 'url' => route('counters.sessions.index'), 'icon' => 'cash', 'keywords' => 'till float open close'] : null,
-        $user->isAdminUser() ? ['id' => 'act-accounts', 'title' => 'Accounts', 'subtitle' => 'Chart, ledger, petty cash', 'url' => route('accounts.opening-balance'), 'icon' => 'accounts', 'keywords' => 'ledger bookkeeping'] : null,
-        $user->isAdminUser() ? ['id' => 'act-reports', 'title' => 'Reports', 'subtitle' => 'Sales analytics', 'url' => route('analytics.overview'), 'icon' => 'chart', 'keywords' => 'analytics report'] : null,
-        $retail && $user->isAdminUser() ? ['id' => 'act-top-sellers', 'title' => 'Top Sellers', 'subtitle' => 'Staff performance', 'url' => route('reports.staff_performance'), 'icon' => 'chart', 'keywords' => 'staff performance sellers'] : null,
+        $user->can('manage accounts') ? ['id' => 'act-accounts', 'title' => 'Accounts', 'subtitle' => 'Chart, ledger, petty cash', 'url' => route('accounts.opening-balance'), 'icon' => 'accounts', 'keywords' => 'ledger bookkeeping'] : null,
+        $user->can('view reports') ? ['id' => 'act-reports', 'title' => 'Reports', 'subtitle' => 'Sales analytics', 'url' => route('analytics.overview'), 'icon' => 'chart', 'keywords' => 'analytics report'] : null,
+        $retail && $user->can('view reports') ? ['id' => 'act-top-sellers', 'title' => 'Top Sellers', 'subtitle' => 'Staff performance', 'url' => route('reports.staff_performance'), 'icon' => 'chart', 'keywords' => 'staff performance sellers'] : null,
 
         // CMS
         $user->can('manage website') ? ['id' => 'act-cms-landing', 'title' => 'Landing Page', 'subtitle' => 'Store branding & features', 'url' => route('cms.landing.edit'), 'icon' => 'page', 'keywords' => 'cms website landing'] : null,
@@ -60,7 +62,7 @@
     <div class="hidden md:flex flex-1 max-w-xl mx-auto">
         <button type="button"
                 @click="open()"
-                class="group relative flex w-full items-center gap-3 rounded-xl border border-slate-200/90 bg-slate-50/90 px-3.5 py-2.5 text-left shadow-sm transition hover:border-blue-300 hover:bg-white hover:shadow-md hover:shadow-blue-100/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
+                class="group relative flex w-full items-center gap-3 rounded-full border border-slate-200/90 bg-white/80 px-3.5 py-2.5 text-left shadow-sm transition hover:border-blue-300 hover:bg-white hover:shadow-md hover:shadow-blue-100/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
             <svg class="h-4 w-4 shrink-0 text-slate-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             <span class="flex-1 truncate text-[13px] text-slate-400 group-hover:text-slate-500">Search products, orders, customers, categories…</span>
             <span class="hidden sm:inline-flex items-center gap-1">

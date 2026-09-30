@@ -50,7 +50,7 @@ class AbandonedCartController extends Controller
         $since = now()->subDays(30);
         $stats = [
             'abandoned' => (clone $abandoned)->where('status', 'active')->count(),
-            'abandoned_value' => (float) (clone $abandoned)->sum('subtotal'),
+            'abandoned_value' => (float) (clone $abandoned)->where('status', 'active')->sum('subtotal'),
             'contacted' => AbandonedCart::forShop($shopId)->where('status', 'contacted')->count(),
             'recovered_30d' => AbandonedCart::forShop($shopId)->where('status', 'recovered')->where('recovered_at', '>=', $since)->count(),
             'recovered_value_30d' => (float) AbandonedCart::forShop($shopId)->where('status', 'recovered')->where('recovered_at', '>=', $since)->sum('subtotal'),

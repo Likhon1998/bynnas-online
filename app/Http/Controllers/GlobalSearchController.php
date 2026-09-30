@@ -38,6 +38,8 @@ class GlobalSearchController extends Controller
         $canSales = Gate::allows('view sales ledger');
         $canWebsite = Gate::allows('manage website');
         $canStaff = Gate::allows('manage staff');
+        $canOrders = Gate::allows('manage orders');
+        $canCustomers = Gate::allows('manage customers');
         $isAdmin = $user->isAdminUser();
 
         if ($canInventory || $canPos) {
@@ -55,11 +57,11 @@ class GlobalSearchController extends Controller
             $this->searchOrders($groups, $shopId, $like, $q, $isAdmin, $canSales);
         }
 
-        if ($isAdmin && $canSales) {
+        if ($canOrders) {
             $this->searchOnlineOrders($groups, $shopId, $like, $q);
         }
 
-        if ($canSales || $canPos) {
+        if ($canCustomers) {
             $this->searchCustomers($groups, $shopId, $like);
         }
 
@@ -407,7 +409,7 @@ class GlobalSearchController extends Controller
                 'title' => $c->name ?: 'Customer',
                 'subtitle' => trim(collect([$c->phone, $c->email])->filter()->implode(' · ')),
                 'meta' => null,
-                'url' => route('customers.edit', $c),
+                'url' => route('customers.show', $c),
                 'icon' => 'customer',
                 'image' => null,
             ])->values(),

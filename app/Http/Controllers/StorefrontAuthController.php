@@ -106,7 +106,29 @@ class StorefrontAuthController extends Controller
             'activeOrderSlides' => $activeOrderSlides,
             'recentOrders' => $recentOrders,
             'memberSince' => $memberSince,
+            'notifications' => $user->notifications()->latest()->take(10)->get(),
+            'unreadNotifications' => $user->unreadNotifications()->count(),
         ]));
+    }
+
+    /** Opening a notification marks it read and jumps to the order tracker. */
+    public function readNotification(string $id): RedirectResponse
+    {
+        $note = Auth::user()->notifications()->whereKey($id)->firstOrFail();
+        $note->markAsRead();
+
+        $invoice = $note->data['invoice'] ?? null;
+
+        return $invoice
+            ? redirect()->route('website.track', ['invoice' => $invoice])
+            : redirect()->to(route('website.account').'#notifications');
+    }
+
+    public function readAllNotifications(): RedirectResponse
+    {
+        Auth::user()->unreadNotifications()->update(['read_at' => now()]);
+
+        return redirect()->to(route('website.account').'#notifications');
     }
 
     public function editProfile(): View|RedirectResponse

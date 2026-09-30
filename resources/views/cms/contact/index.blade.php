@@ -63,7 +63,7 @@
             </div>
             <div>
                 <label class="text-[11px] font-bold uppercase text-slate-500">Live chat status</label>
-                <input name="contact_chat_status" value="{{ old('contact_chat_status', $settings->contact_chat_status ?? 'Available 24/7') }}" class="mt-1 w-full rounded-xl border-slate-200 text-sm">
+                <input name="contact_chat_status" value="{{ old('contact_chat_status', $settings->contact_chat_status) }}" class="mt-1 w-full rounded-xl border-slate-200 text-sm">
             </div>
             <div class="md:col-span-2">
                 <label class="text-[11px] font-bold uppercase text-slate-500">Live chat text</label>
@@ -117,22 +117,13 @@
             </div>
 
             <div class="md:col-span-2 pt-2"><p class="text-xs font-bold uppercase tracking-wider text-indigo-600">Social links</p></div>
-            <div>
-                <label class="text-[11px] font-bold uppercase text-slate-500">Facebook</label>
-                <input name="social_facebook" value="{{ old('social_facebook', $social['facebook'] ?? '') }}" class="mt-1 w-full rounded-xl border-slate-200 text-sm" placeholder="https://facebook.com/…">
-            </div>
-            <div>
-                <label class="text-[11px] font-bold uppercase text-slate-500">X / Twitter</label>
-                <input name="social_twitter" value="{{ old('social_twitter', $social['twitter'] ?? '') }}" class="mt-1 w-full rounded-xl border-slate-200 text-sm" placeholder="https://x.com/…">
-            </div>
-            <div>
-                <label class="text-[11px] font-bold uppercase text-slate-500">Instagram</label>
-                <input name="social_instagram" value="{{ old('social_instagram', $social['instagram'] ?? '') }}" class="mt-1 w-full rounded-xl border-slate-200 text-sm">
-            </div>
-            <div>
-                <label class="text-[11px] font-bold uppercase text-slate-500">YouTube</label>
-                <input name="social_youtube" value="{{ old('social_youtube', $social['youtube'] ?? '') }}" class="mt-1 w-full rounded-xl border-slate-200 text-sm">
-            </div>
+            @foreach(\App\Models\SiteSetting::SOCIAL_NETWORKS as $net => $meta)
+                <div>
+                    <label class="text-[11px] font-bold uppercase text-slate-500">{{ $meta['label'] }}</label>
+                    <input name="social[{{ $net }}]" value="{{ old('social.'.$net, $social[$net] ?? '') }}" class="mt-1 w-full rounded-xl border-slate-200 text-sm" placeholder="{{ $meta['placeholder'] }}">
+                </div>
+            @endforeach
+            <p class="md:col-span-2 -mt-1 text-[11px] text-slate-500">Filled links appear as icons in the website footer and on the Contact page.</p>
 
             <div class="md:col-span-2 flex justify-end">
                 <button type="submit" class="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800">Save contact settings</button>

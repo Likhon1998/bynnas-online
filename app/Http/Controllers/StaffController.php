@@ -73,7 +73,7 @@ class StaffController extends Controller
         $data = $this->validatedStaff($request, $user->shop_id);
 
         if (in_array($data['role'], $this->adminRoleNames, true)) {
-            return back()->withInput()->with('error', 'Admin / Shop Owner accounts cannot be created from Staff. They cannot be assigned to a counter.');
+            return back()->withInput()->with('error', 'Admin / Shop Owner accounts cannot be created from Staff.' . (retail_enabled() ? ' They cannot be assigned to a counter.' : ''));
         }
 
         if (in_array($data['role'], $this->customerRoleNames, true)) {

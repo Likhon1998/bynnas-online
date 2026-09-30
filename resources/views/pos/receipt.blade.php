@@ -9,7 +9,11 @@
         $issuedAt = $order->created_at?->copy()->timezone($tz);
         $printedAt = now()->timezone($tz);
         $shop = $order->shop ?? Auth::user()->shop ?? null;
-        $shopName = $shop->name ?? config('app.name', 'Bynnas Social');
+        $storeSettings = app(\App\Services\WebsiteService::class)->settings();
+        $shopName = $storeSettings->store_name ?: ($shop->name ?? config('app.name', 'Bynnas Social'));
+        $storeLogo = $storeSettings->logo_path ? public_storage_url($storeSettings->logo_path) : null;
+        $storeContact = array_filter([$storeSettings->contact_phone, $storeSettings->contact_email, $storeSettings->contact_address]);
+        $tzLabel = $issuedAt?->format('T') ?? $tz;
         $isOnline = $order->isOnlineOrder();
         $paymentState = $order->receiptPaymentState();
         $isVoid = $paymentState['is_void'];
@@ -338,8 +342,14 @@
         @endif
 
         <header class="brand">
-            <div class="doc-type">{{ $isOnline ? 'Tax Invoice / Online Order' : 'Sales Invoice / POS Receipt' }}</div>
+            <div class="doc-type">{{ $isOnline ? 'Invoice / Online Order' : 'Sales Invoice / POS Receipt' }}</div>
+            @if($storeLogo)
+                <img src="{{ $storeLogo }}" alt="" style="max-height:48px;max-width:160px;margin:0 auto 6px;display:block;">
+            @endif
             <h1>{{ $shopName }}</h1>
+            @if($storeContact)
+                <p class="tagline">{{ implode(' · ', $storeContact) }}</p>
+            @endif
             <p class="tagline">
                 @if($isOnline && $hasOpenDue && $order->isCashOnDelivery())
                     COD order — payment due on delivery
@@ -362,7 +372,7 @@
             </tr>
             <tr>
                 <td class="lbl">Time</td>
-                <td class="val">{{ $issuedAt?->format('h:i A') ?? '—' }} (BST)</td>
+                <td class="val">{{ $issuedAt?->format('h:i A') ?? '—' }} ({{ $tzLabel }})</td>
             </tr>
             <tr>
                 <td class="lbl">Channel</td>
@@ -394,7 +404,7 @@
         @else
             <section class="party">
                 <div class="eyebrow">Bill To</div>
-                <p class="name">Walk-in Customer</p>
+                <p class="name">{{ $isOnline ? 'Guest' : 'Walk-in Customer' }}</p>
             </section>
         @endif
 
@@ -640,7 +650,7 @@
         <footer class="footer">
             <p class="thanks">Thank you for your business</p>
             <p class="note">Please retain this invoice for your records.</p>
-            <p class="stamp">Printed: {{ $printedAt->format('d M Y, h:i A') }} · Asia/Dhaka</p>
+            <p class="stamp">Printed: {{ $printedAt->format('d M Y, h:i A') }} · {{ $tz }}</p>
             @include('partials.powered-by', ['variant' => 'print'])
         </footer>
     </div>

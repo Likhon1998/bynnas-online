@@ -1,12 +1,15 @@
 <div class="space-y-4">
-    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        @foreach([
+    @php
+        $orderCards = array_values(array_filter([
             ['Total', $orderSummary['total'], 'text-indigo-600'],
-            ['POS', $orderSummary['pos'], 'text-sky-600'],
+            retail_enabled() ? ['POS', $orderSummary['pos'], 'text-sky-600'] : null,
             ['Online', $orderSummary['web'], 'text-emerald-600'],
             ['Pending', $orderSummary['pending'], 'text-amber-600'],
             ['Completed', $orderSummary['completed'], 'text-violet-600'],
-        ] as [$label, $value, $tone])
+        ]));
+    @endphp
+    <div class="grid grid-cols-2 {{ count($orderCards) === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4' }} gap-4">
+        @foreach($orderCards as [$label, $value, $tone])
             <div class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
                 <p class="text-[10px] font-bold text-gray-400 uppercase">{{ $label }}</p>
                 <p class="text-2xl font-black {{ $tone }} mt-2">{{ number_format($value) }}</p>
@@ -39,10 +42,10 @@
                         <tr class="hover:bg-gray-50/80">
                             <td class="px-5 py-3 font-semibold text-gray-900">{{ $order->invoice_no }}</td>
                             <td class="px-5 py-3 text-gray-500 whitespace-nowrap">{{ $order->created_at->format('d M Y, h:i A') }}</td>
-                            <td class="px-5 py-3">{{ $order->customer?->name ?? 'Walk-in' }}</td>
+                            <td class="px-5 py-3">{{ $order->delivery_name ?: ($order->customer?->name ?? 'Guest') }}</td>
                             <td class="px-5 py-3">
                                 <span class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold {{ $order->counter_id ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700' }}">
-                                    {{ $order->counter_id ? 'POS' : 'Online' }}
+                                    {{ $order->counter_id ? (retail_enabled() ? 'POS' : 'In-store (legacy)') : 'Online' }}
                                 </span>
                             </td>
                             <td class="px-5 py-3 capitalize text-gray-600">{{ $order->payment_method }}</td>

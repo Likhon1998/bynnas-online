@@ -41,4 +41,21 @@ class CourierService extends Model
     {
         return $query->where('shop_id', $shopId);
     }
+
+    /** Shipping requires a courier, so a new shop starts with the common local services. */
+    public static function ensureDefaults(int $shopId): void
+    {
+        if (static::forShop($shopId)->exists()) {
+            return;
+        }
+
+        foreach (['Pathao', 'Steadfast', 'RedX', 'Paperfly'] as $i => $name) {
+            static::create([
+                'shop_id' => $shopId,
+                'name' => $name,
+                'sort_order' => $i + 1,
+                'is_active' => true,
+            ]);
+        }
+    }
 }

@@ -5,7 +5,7 @@
     $compareAt = $product->compareAtPrice();
     $img = $ws->productImageUrl($product);
     $displayName = $product->storefrontDisplayName();
-    $catLabel = $product->category?->name ?? $product->brand_name ?? 'Electronics';
+    $catLabel = $product->category?->name ?? $product->brand_name ?? '';
     $isNew = $product->showsAsNew();
     $cartItem = [
         'id' => $product->id,
@@ -42,12 +42,14 @@
         <p class="gaget-product-cat">{{ $catLabel }}</p>
         <a href="{{ route('website.product', $product) }}" class="gaget-product-name">{{ $displayName }}</a>
 
+        @if(($product->review_count ?? 0) > 0)
         <div class="gaget-stars">
             @for($i = 1; $i <= 5; $i++)
                 <span class="gaget-star {{ $i > round($product->rating ?? 0) ? 'gaget-star-empty' : '' }}">★</span>
             @endfor
-            <span class="gaget-review-count">({{ number_format($product->review_count ?: 0) }})</span>
+            <span class="gaget-review-count">({{ number_format($product->review_count) }})</span>
         </div>
+        @endif
 
         <div class="gs-card-footer">
             <div class="gaget-price-row">

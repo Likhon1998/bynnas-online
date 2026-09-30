@@ -193,7 +193,7 @@
             </div>
 
             {{-- Order --}}
-            @if($lead->status !== 'converted' && $lead->phone)
+            @if(! in_array($lead->status, ['converted', 'lost'], true) && $lead->phone)
                 <div class="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm"
                      x-data="leadOrderForm(@js($productOptions), @js($lead->product_id), @js(old('items')))">
                     <h2 class="mb-1 text-[14px] font-bold text-slate-900">Create order</h2>

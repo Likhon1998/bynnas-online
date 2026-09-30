@@ -6,308 +6,284 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Sign In · {{ data_get($settings ?? null, 'store_name') ?: config('app.name', 'Bynnas Social') }}</title>
     @include('partials.favicon', ['settings' => $settings ?? null])
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=manrope:400,500,600,700,800&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     {{-- CSS only: app.js CSRF refresh races with form POST on php artisan serve (single-threaded) and causes 419 Page Expired. --}}
     @vite(['resources/css/app.css'])
     <style>
         :root {
-            --neon: #22d3ee;
-            --neon-dim: rgba(34, 211, 238, 0.35);
-            --ink: #e8eef7;
-            --muted: #8b9bb4;
-            --panel: #0a101c;
+            --bl-cream: #fffaf5;
+            --bl-peach: #fcebdd;
+            --bl-coral: #ec8560;
+            --bl-coral-deep: #b84f2c;
+            --bl-coral-edge: #8a3a20;
+            --bl-purple: #8b6fd6;
+            --bl-purple-deep: #6a4bb8;
+            --bl-lavender: #efe9fc;
+            --bl-sun: #f4b740;
+            --bl-ink: #3a2a24;
+            --bl-muted: #654f45;
+            --bl-line: #f2e6dc;
+            --bl-display: 'Fredoka', 'Nunito', system-ui, sans-serif;
         }
-        .neon-login {
+        .bl-body {
             min-height: 100vh;
             margin: 0;
-            font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
-            color: var(--ink);
-            background: #020617;
+            font-family: 'Nunito', ui-sans-serif, system-ui, sans-serif;
+            color: var(--bl-ink);
+            background-color: var(--bl-cream);
+            background-image:
+                radial-gradient(circle at 12px 12px, rgba(236, 133, 96, .12) 2.5px, transparent 3px),
+                radial-gradient(circle at 46px 40px, rgba(139, 111, 214, .12) 2.5px, transparent 3px),
+                radial-gradient(circle at 70px 10px, rgba(143, 163, 126, .14) 2px, transparent 2.5px);
+            background-size: 84px 64px;
             -webkit-font-smoothing: antialiased;
         }
-        .neon-login * { box-sizing: border-box; }
+        .bl-body * { box-sizing: border-box; }
 
-        .neon-stage {
+        .bl-stage {
             position: relative;
             min-height: 100vh;
             display: grid;
             place-items: center;
-            padding: 24px 14px;
-        }
-        .neon-bg {
-            position: absolute;
-            inset: 0;
+            padding: 28px 16px;
             overflow: hidden;
-            background:
-                radial-gradient(700px 380px at 20% 15%, rgba(34, 211, 238, 0.12), transparent 60%),
-                radial-gradient(640px 360px at 80% 85%, rgba(59, 130, 246, 0.1), transparent 55%),
-                #020617;
         }
-        .neon-bg__grid {
-            position: absolute;
-            inset: 0;
-            background-image:
-                linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
-            background-size: 40px 40px;
-            mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, #000 20%, transparent 75%);
-            animation: neon-grid 20s linear infinite;
-        }
+        .bl-blob { position: absolute; border-radius: 50%; filter: blur(2px); pointer-events: none; }
+        .bl-blob--a { width: 340px; height: 340px; left: -120px; top: -110px; background: radial-gradient(circle, #fde1d3 0%, rgba(253, 225, 211, 0) 70%); }
+        .bl-blob--b { width: 380px; height: 380px; right: -140px; bottom: -150px; background: radial-gradient(circle, #e7ddfb 0%, rgba(231, 221, 251, 0) 70%); }
 
-        .neon-panel-wrap {
+        .bl-card {
             position: relative;
             z-index: 1;
-            width: min(100%, 340px);
-            animation: neon-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+            width: min(100%, 820px);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            border-radius: 28px;
+            overflow: hidden;
+            background: #fff;
+            border: 2px solid #f6e7dc;
+            box-shadow: 0 7px 0 #f3dccd, 0 28px 60px rgba(214, 150, 118, .18);
+            animation: bl-in .55s cubic-bezier(.22, 1, .36, 1) both;
         }
 
-        /* Compact embossed neon card */
-        .neon-panel {
-            border-radius: 18px;
-            padding: 1px;
-            background: linear-gradient(145deg, rgba(34, 211, 238, 0.7), rgba(30, 41, 59, 0.9) 42%, rgba(34, 211, 238, 0.35));
-            box-shadow:
-                0 18px 50px rgba(0, 0, 0, 0.45),
-                0 0 28px rgba(34, 211, 238, 0.12);
-        }
-        .neon-panel__inner {
-            border-radius: 17px;
-            padding: 22px 20px 18px;
-            background:
-                linear-gradient(180deg, #101827 0%, #0a101c 100%);
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.07),
-                inset 0 -12px 28px rgba(0, 0, 0, 0.28),
-                inset 0 10px 22px rgba(34, 211, 238, 0.03);
-        }
-
-        .neon-brand {
+        /* Brand side */
+        .bl-side {
+            position: relative;
             display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 16px;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 28px;
+            padding: 30px 30px 26px;
+            background:
+                radial-gradient(circle at 18px 18px, rgba(255, 255, 255, .55) 3px, transparent 3.5px) 0 0 / 36px 36px,
+                linear-gradient(150deg, #fde7da 0%, #fbdccd 45%, #efe4fb 100%);
         }
-        .neon-brand__mark {
-            width: 40px;
-            height: 40px;
-            border-radius: 11px;
+        .bl-brand { display: flex; align-items: center; gap: 11px; }
+        .bl-brand__mark {
+            width: 44px;
+            height: 44px;
+            flex-shrink: 0;
             display: grid;
             place-items: center;
-            flex-shrink: 0;
-            background: linear-gradient(160deg, rgba(34, 211, 238, 0.16), rgba(15, 23, 42, 0.95));
-            border: 1px solid rgba(34, 211, 238, 0.4);
-            box-shadow:
-                0 0 16px rgba(34, 211, 238, 0.22),
-                inset 0 1px 0 rgba(255, 255, 255, 0.12),
-                inset 0 -6px 12px rgba(0, 0, 0, 0.4);
+            border-radius: 14px;
+            background: #fff;
+            box-shadow: 0 4px 0 #f1cdb9;
+            overflow: hidden;
+            font-family: var(--bl-display);
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--bl-coral-deep);
         }
-        .neon-brand__mark img {
+        .bl-brand__mark img { width: 30px; height: 30px; object-fit: contain; display: block; }
+        .bl-brand__name {
+            margin: 0;
+            font-family: var(--bl-display);
+            font-size: 17px;
+            font-weight: 600;
+            line-height: 1.15;
+            color: var(--bl-ink);
+        }
+        .bl-brand__sub { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #7a5a4d; }
+
+        .bl-hello__title {
+            margin: 0 0 10px;
+            font-family: var(--bl-display);
+            font-size: 30px;
+            font-weight: 700;
+            line-height: 1.1;
+            color: var(--bl-ink);
+        }
+        .bl-hello__text { margin: 0; max-width: 30ch; font-size: 14px; font-weight: 600; line-height: 1.55; color: #7a5f53; }
+        .bl-balls { display: flex; align-items: flex-end; gap: 8px; height: 34px; margin-bottom: 14px; }
+        .bl-balls i {
+            display: block;
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            background: var(--bl-coral);
+            box-shadow: inset -2px -2px 0 rgba(0, 0, 0, .08);
+            transform-origin: 50% 100%;
+            animation: bl-hop .9s cubic-bezier(.45, 0, .55, 1) infinite;
+        }
+        .bl-balls i:nth-child(2) { background: var(--bl-purple); animation-delay: .14s; }
+        .bl-balls i:nth-child(3) { background: var(--bl-sun); animation-delay: .28s; }
+
+        .bl-perks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+        .bl-perks li {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #6f5a50;
+        }
+        .bl-perks span {
             width: 24px;
             height: 24px;
-            object-fit: contain;
-            display: block;
+            flex-shrink: 0;
+            display: grid;
+            place-items: center;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, .8);
+            color: var(--bl-coral-deep);
         }
-        .neon-brand__mark svg {
-            width: 18px;
-            height: 18px;
-            color: var(--neon);
-            filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.7));
-        }
-        .neon-brand__meta { min-width: 0; }
-        .neon-brand__name {
-            margin: 0;
-            font-size: 14px;
-            font-weight: 800;
-            letter-spacing: 0.01em;
-            color: #f8fafc;
-            line-height: 1.2;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .neon-brand__sub {
-            margin: 2px 0 0;
-            font-size: 11.5px;
-            font-weight: 500;
-            color: var(--muted);
-        }
+        .bl-perks svg { width: 13px; height: 13px; }
 
-        .neon-title {
+        /* Form side */
+        .bl-main { padding: 34px 32px 26px; }
+        .bl-title {
             margin: 0 0 4px;
-            font-size: 18px;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            color: #f8fafc;
-        }
-        .neon-lead {
-            margin: 0 0 16px;
-            font-size: 12.5px;
-            font-weight: 500;
-            line-height: 1.45;
-            color: var(--muted);
-        }
-
-        .neon-alert {
-            margin-bottom: 12px;
-            border-radius: 10px;
-            padding: 9px 11px;
-            border: 1px solid rgba(244, 63, 94, 0.4);
-            background: rgba(127, 29, 29, 0.28);
-            color: #fecdd3;
-            font-size: 12px;
-            line-height: 1.4;
-        }
-        .neon-alert strong {
-            display: block;
-            color: #fff;
-            margin-bottom: 1px;
-            font-size: 12.5px;
-        }
-        .neon-status {
-            margin-bottom: 12px;
-            border-radius: 10px;
-            padding: 9px 11px;
-            border: 1px solid rgba(34, 211, 238, 0.3);
-            background: rgba(8, 47, 73, 0.4);
-            color: #a5f3fc;
-            text-align: center;
-            font-size: 12px;
-        }
-
-        .neon-form { display: grid; gap: 12px; }
-        .neon-label-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-            margin-bottom: 5px;
-        }
-        .neon-label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 11.5px;
-            font-weight: 700;
-            color: #cbd5e1;
-        }
-        .neon-label-row .neon-label { margin-bottom: 0; }
-        .neon-forgot {
-            font-size: 11.5px;
+            font-family: var(--bl-display);
+            font-size: 24px;
             font-weight: 600;
-            color: var(--neon);
-            text-decoration: none;
+            color: var(--bl-ink);
         }
-        .neon-forgot:hover { color: #67e8f9; }
+        .bl-lead { margin: 0 0 20px; font-size: 13px; font-weight: 500; line-height: 1.5; color: var(--bl-muted); }
 
-        .neon-field { position: relative; }
-        .neon-field input {
+        .bl-alert,
+        .bl-status {
+            margin-bottom: 14px;
+            border-radius: 12px;
+            padding: 10px 12px;
+            font-size: 12.5px;
+            line-height: 1.45;
+        }
+        .bl-alert { border: 1px solid #f6c9c0; background: #fff1ee; color: #a2412c; }
+        .bl-alert strong { display: block; margin-bottom: 1px; font-size: 13px; color: #8a2f1c; }
+        .bl-status { border: 1px solid #d8ccf6; background: var(--bl-lavender); color: var(--bl-purple-deep); text-align: center; }
+
+        .bl-form { display: grid; gap: 14px; }
+        .bl-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+        .bl-label { display: block; margin-bottom: 6px; font-size: 12.5px; font-weight: 800; color: #5a463d; }
+        .bl-label-row .bl-label { margin-bottom: 0; }
+        .bl-forgot { font-size: 12px; font-weight: 700; color: #6a4bc4; text-decoration: none; }
+        .bl-forgot:hover { color: var(--bl-purple-deep); text-decoration: underline; }
+
+        .bl-field { position: relative; }
+        .bl-field input {
             width: 100%;
-            height: 42px;
-            border-radius: 10px;
-            border: 1px solid rgba(34, 211, 238, 0.18);
-            background: linear-gradient(180deg, #070b14, #0c1320);
-            color: #f8fafc;
-            padding: 0 38px 0 12px;
-            font-size: 13px;
+            height: 46px;
+            padding: 0 40px 0 14px;
+            border: 2px solid var(--bl-line);
+            border-radius: 14px;
+            background: var(--bl-cream);
+            color: var(--bl-ink);
             font-family: inherit;
-            font-weight: 500;
+            font-size: 14px;
+            font-weight: 600;
             outline: none;
-            box-shadow:
-                inset 0 2px 6px rgba(0, 0, 0, 0.5),
-                inset 0 -1px 0 rgba(255, 255, 255, 0.04);
-            transition: border-color .15s ease, box-shadow .15s ease;
+            box-shadow: none;
+            transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
         }
-        .neon-field input::placeholder { color: #64748b; }
-        .neon-field input:focus {
-            border-color: rgba(34, 211, 238, 0.65);
-            box-shadow:
-                inset 0 2px 6px rgba(0, 0, 0, 0.5),
-                0 0 0 3px rgba(34, 211, 238, 0.12),
-                0 0 16px rgba(34, 211, 238, 0.12);
+        .bl-field input::placeholder { color: #8a7468; font-weight: 500; }
+        .bl-field input:focus {
+            border-color: var(--bl-coral);
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(236, 133, 96, .14);
         }
-        .neon-field__icon {
+        .bl-field__icon {
             position: absolute;
-            right: 11px;
+            right: 14px;
             top: 50%;
+            width: 17px;
+            height: 17px;
             transform: translateY(-50%);
-            width: 15px;
-            height: 15px;
-            color: #64748b;
+            color: #c6b3a8;
             pointer-events: none;
         }
-        .neon-field input:focus + .neon-field__icon {
-            color: var(--neon);
-        }
+        .bl-field input:focus + .bl-field__icon { color: var(--bl-coral); }
 
-        .neon-check {
+        .bl-check {
             display: flex;
             align-items: center;
             gap: 8px;
-            color: var(--muted);
-            font-size: 12.5px;
-            font-weight: 500;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--bl-muted);
+            cursor: pointer;
             user-select: none;
         }
-        .neon-check input {
-            width: 14px;
-            height: 14px;
-            accent-color: var(--neon);
-            cursor: pointer;
-        }
+        .bl-check input { width: 16px; height: 16px; border-radius: 5px; border-color: #e3cfc3; color: var(--bl-coral); accent-color: var(--bl-coral); cursor: pointer; }
+        .bl-check input:focus { box-shadow: 0 0 0 3px rgba(236, 133, 96, .18); }
 
-        .neon-submit {
+        .bl-submit {
             width: 100%;
-            height: 42px;
-            border: 0;
-            border-radius: 10px;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 13px;
-            font-weight: 700;
-            color: #041016;
+            height: 48px;
+            margin-top: 4px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 7px;
-            background: linear-gradient(135deg, #67e8f9, #22d3ee 55%, #38bdf8);
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.28),
-                0 8px 20px rgba(34, 211, 238, 0.28);
-            transition: transform .15s ease, filter .15s ease;
+            gap: 8px;
+            border: 0;
+            border-radius: 999px;
+            background: #bf5230;
+            color: #fff;
+            font-family: var(--bl-display);
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: .01em;
+            cursor: pointer;
+            box-shadow: 0 5px 0 var(--bl-coral-edge), 0 12px 22px rgba(236, 133, 96, .28);
+            transition: transform .18s cubic-bezier(.34, 1.56, .64, 1), box-shadow .18s ease, background .18s ease;
         }
-        .neon-submit:hover {
-            filter: brightness(1.05);
-            transform: translateY(-1px);
-        }
-        .neon-submit:active { transform: none; }
-        .neon-submit svg { width: 15px; height: 15px; }
+        .bl-submit:hover { background: #9e4225; transform: translateY(-2px); }
+        .bl-submit:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--bl-coral-edge); }
+        .bl-submit:focus-visible { outline: 3px solid rgba(139, 111, 214, .45); outline-offset: 3px; }
+        .bl-submit svg { width: 16px; height: 16px; }
 
-        .neon-foot {
-            margin: 14px 0 0;
-            text-align: center;
-            color: #64748b;
-            font-size: 11px;
-            line-height: 1.4;
-        }
-        .neon-foot strong { color: #94a3b8; font-weight: 700; }
-        .neon-foot__link { color: inherit; text-decoration: none; }
-        .neon-foot__link:hover strong { color: #22d3ee; }
+        .bl-foot { margin: 18px 0 0; text-align: center; font-size: 11.5px; color: #6f5b52; }
+        .bl-foot a { color: inherit; text-decoration: none; }
+        .bl-foot strong { color: var(--bl-muted); font-weight: 800; }
+        .bl-foot a:hover strong { color: #6a4bc4; }
 
-        @keyframes neon-grid {
-            from { background-position: 0 0, 0 0; }
-            to { background-position: 0 40px, 40px 0; }
+        @keyframes bl-hop {
+            0%, 100% { transform: translateY(0) scale(1.25, .75); }
+            18% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-18px) scale(.92, 1.08); }
+            82% { transform: translateY(0) scale(1); }
         }
-        @keyframes neon-in {
-            from { opacity: 0; transform: translateY(14px) scale(0.98); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
+        @keyframes bl-in {
+            from { opacity: 0; transform: translateY(14px) scale(.98); }
+            to { opacity: 1; transform: none; }
         }
 
+        @media (max-width: 760px) {
+            .bl-card { grid-template-columns: 1fr; width: min(100%, 420px); border-radius: 24px; }
+            .bl-side { gap: 14px; padding: 20px 22px 18px; }
+            .bl-hello__title { font-size: 22px; margin-bottom: 4px; }
+            .bl-hello__text { font-size: 13px; }
+            .bl-balls { display: none; }
+            .bl-perks { display: none; }
+            .bl-main { padding: 24px 22px 20px; }
+        }
         @media (prefers-reduced-motion: reduce) {
-            .neon-bg__grid, .neon-panel-wrap { animation: none !important; }
+            .bl-card, .bl-balls i { animation: none !important; }
         }
     </style>
 </head>
-<body class="neon-login antialiased">
+<body class="bl-body">
     {{ $slot }}
 </body>
 </html>

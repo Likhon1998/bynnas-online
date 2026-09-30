@@ -212,7 +212,7 @@ class DashboardController extends Controller
         $categorySalesTotal = (float) $categorySales->sum('revenue');
 
         $pendingOnlineOrders = 0;
-        if ($isAdmin && $filterCounterId === null) {
+        if ($user->can('manage orders') && $filterCounterId === null) {
             $pendingOnlineOrders = (int) Order::where('shop_id', $shopId)
                 ->onlineOrders()
                 ->whereIn('status', \App\Support\OrderStatus::newValues())

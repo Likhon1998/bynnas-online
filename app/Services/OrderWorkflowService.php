@@ -52,6 +52,12 @@ class OrderWorkflowService
         $this->guard($order, $from, $to, $data, $courier);
 
         DB::transaction(function () use ($order, $from, $to, $data, $userId, $courier) {
+            // Two staff acting on the same order must not both apply stock/ledger side effects.
+            $current = Order::whereKey($order->id)->lockForUpdate()->value('status');
+            if (OrderStatus::normalize((string) $current) !== $from) {
+                throw new OrderWorkflowException('This order was just updated by someone else. Refresh the page and try again.');
+            }
+
             $updates = ['status' => $to];
 
             if ($courier) {
@@ -96,13 +102,14 @@ class OrderWorkflowService
 
             $order->update($updates);
 
-            $this->tracking->upsertLatestLog(
+            $this->tracking->log(
                 $order,
                 $to,
                 ($data['note'] ?? null) ?: $this->defaultNote($order, $from, $to),
                 $order->shipping_courier,
                 $order->shipping_tracking_no,
                 $userId,
+                $from,
             );
 
             if (in_array($to, [OrderStatus::PACKED, OrderStatus::SHIPPED, OrderStatus::DELIVERED, OrderStatus::COMPLETED], true)) {

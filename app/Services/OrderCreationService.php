@@ -27,7 +27,7 @@ class OrderCreationService
     /**
      * @param  array{name: string, phone: string, address: string, email?: ?string}  $contact
      * @param  list<array{id: int|string, qty: int|string}>  $items
-     * @param  array{zone?: ?string, payment_method?: ?string, attribution?: array, landing_page_id?: ?int, lead_id?: ?int, note?: ?string, context?: array}  $options
+     * @param  array{zone?: ?string, payment_method?: ?string, payment_reference?: ?string, attribution?: array, landing_page_id?: ?int, lead_id?: ?int, note?: ?string, context?: array}  $options
      * @return array{order: Order, quote: array, message: string}
      *
      * @throws OrderCreationException
@@ -66,6 +66,9 @@ class OrderCreationService
                 'confirmation_charge' => $quote['confirmation_amount'],
                 'paid_amount' => $quote['amount_paid_now'],
                 'payment_method' => $quote['payment_method'],
+                'payment_reference' => $quote['payment_method'] === DeliveryChargeService::PAY_CONFIRMATION && filled($options['payment_reference'] ?? null)
+                    ? mb_substr(trim((string) $options['payment_reference']), 0, 100)
+                    : null,
                 'status' => OrderStatus::NEW,
                 'counter_id' => null,
                 'landing_page_id' => $options['landing_page_id'] ?? null,

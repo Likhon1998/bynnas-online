@@ -17,7 +17,7 @@
                 'baki' => (float) ($c->baki_balance ?? 0),
                 'baki_fmt' => format_taka_number((float) ($c->baki_balance ?? 0)),
                 'baki_url' => route('customers.baki.show', $c),
-                'orders' => (int) ($c->orders_count ?? 0),
+                'orders' => (int) ($c->seg_orders ?? 0),
                 'channel' => $c->user_id ? 'online' : 'offline',
                 'joined' => optional($c->created_at)->format('M j, Y'),
                 'initials' => strtoupper(mb_substr($c->name ?: 'CU', 0, 2)),
@@ -66,13 +66,13 @@
                     <button type="button" @click="tab = 'online'"
                             class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition"
                             :class="tab === 'online' ? 'bg-sky-50 font-semibold text-sky-800' : 'hover:bg-slate-50'">
-                        <span class="text-sky-500">Online</span>
+                        <span class="text-sky-500">With account</span>
                         <span class="tabular-nums" x-text="onlineCount">{{ $onlineCount }}</span>
                     </button>
                     <button type="button" @click="tab = 'offline'"
                             class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition"
                             :class="tab === 'offline' ? 'bg-amber-50 font-semibold text-amber-800' : 'hover:bg-slate-50'">
-                        <span class="text-amber-600">Offline</span>
+                        <span class="text-amber-600">{{ $retail ? 'Guest / in-store' : 'Guest' }}</span>
                         <span class="tabular-nums" x-text="offlineCount">{{ $offlineCount }}</span>
                     </button>
                 </div>
@@ -119,7 +119,7 @@
                                                 <a :href="c.show" class="truncate text-[13px] font-semibold text-slate-900 hover:text-indigo-700" x-text="c.name"></a>
                                                 <span class="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
                                                       :class="c.channel === 'online' ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-700'"
-                                                      x-text="c.channel === 'online' ? 'Online' : 'Offline'"></span>
+                                                      x-text="c.channel === 'online' ? 'Account' : 'Guest'"></span>
                                             </div>
                                             <p class="mt-0.5 text-[10px] text-slate-400">Joined <span x-text="c.joined"></span> · spent Tk <span x-text="c.spent_fmt"></span></p>
                                             <div class="mt-0.5 flex flex-wrap gap-1" x-show="c.segments.length">
@@ -182,7 +182,7 @@
                     of <span class="text-slate-700" x-text="rows.length"></span>
                 </span>
                 <span x-show="tab !== 'all'" x-cloak>
-                    <span class="text-slate-700" x-text="tab === 'online' ? 'Online only' : 'Offline only'"></span>
+                    <span class="text-slate-700" x-text="tab === 'online' ? 'With account only' : 'Guests only'"></span>
                 </span>
             </div>
         </div>
@@ -213,15 +213,15 @@
             },
             get emptyTitle() {
                 if (this.q.trim()) return 'No matches';
-                if (this.tab === 'online') return 'No online customers yet';
-                if (this.tab === 'offline') return 'No offline customers yet';
+                if (this.tab === 'online') return 'No customers with an account yet';
+                if (this.tab === 'offline') return 'No guest customers yet';
                 return 'No customers found';
             },
             get emptyHint() {
                 if (this.q.trim()) return 'Try another name, phone, or email.';
                 if (this.tab === 'online') return 'Customers who register on the website appear here.';
-                if (this.tab === 'offline') return 'Walk-in POS customers appear here when you sell with a phone number.';
-                return 'Add a customer or wait for website / POS sales.';
+                if (this.tab === 'offline') return 'Shoppers who check out without an account (website or landing pages) appear here.';
+                return 'Add a customer or wait for website orders.';
             },
             async remove(c) {
                 const ok = await window.adminConfirm({

@@ -21,6 +21,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'module' => \App\Http\Middleware\EnsureModuleEnabled::class,
         ]);
 
+        // Gateways post back server-to-server; the driver verifies each callback instead.
+        $middleware->validateCsrfTokens(except: ['payment/callback/*']);
+
         // Drop leftover staff sessions from the customer (web) guard on every request.
         $middleware->appendToGroup('web', [
             \App\Http\Middleware\EnsureStorefrontWebGuardIsCustomer::class,

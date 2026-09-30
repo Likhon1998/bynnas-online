@@ -154,9 +154,9 @@
                         <p class="gaget-order-placed-banner__title">Order placed successfully</p>
                         <p class="gaget-order-placed-banner__text">
                             @if($justPlacedInvoice)
-                                Your order <strong>{{ $justPlacedInvoice }}</strong> is confirmed. Track it below — we’ll update status as it moves.
+                                We’ve received order <strong>{{ $justPlacedInvoice }}</strong> and will contact you to confirm it. Track it below — we’ll update status as it moves.
                             @else
-                                Your order is confirmed. Track it below — we’ll update status as it moves.
+                                We’ve received your order and will contact you to confirm it. Track it below — we’ll update status as it moves.
                             @endif
                         </p>
                     </div>
@@ -316,7 +316,7 @@
                                 </div>
 
                                 <ol class="acct-timeline acct-timeline--compact">
-                                    <template x-for="(step, sIdx) in track" :key="current.id + '-track-' + step.key">
+                                    <template x-for="(step, sIdx) in track" :key="(current?.id ?? 'none') + '-track-' + step.key">
                                         <li class="acct-timeline__item"
                                             :class="{
                                                 'is-done': step.done,
@@ -535,8 +535,8 @@
 
                     <div class="acct-info-card rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm min-w-0">
                         <div class="mb-3 flex items-center justify-between gap-2 min-w-0">
-                            <h2 class="text-[15px] font-bold text-slate-900">Shipping Addresses</h2>
-                            <span class="shrink-0 text-[11px] font-semibold text-blue-600">+ Add</span>
+                            <h2 class="text-[15px] font-bold text-slate-900">Shipping Address</h2>
+                            <a href="{{ route('website.account.profile.edit') }}" class="shrink-0 text-[11px] font-semibold text-blue-600">Edit</a>
                         </div>
                         <div class="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3 min-w-0">
                             <div class="mb-2 flex items-center justify-between gap-2">
@@ -548,22 +548,42 @@
                                 <p class="mt-2 text-[11px] font-medium text-slate-600 break-all">{{ $customer->phone }}</p>
                             @endif
                         </div>
-                        <button type="button" class="acct-info-btn mt-4">View All Addresses</button>
                     </div>
 
-                    <div class="acct-info-card rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm min-w-0">
+                    <div id="notifications" class="acct-info-card rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm min-w-0">
                         <div class="mb-3 flex items-center justify-between gap-2 min-w-0">
-                            <h2 class="text-[15px] font-bold text-slate-900">Payment Methods</h2>
-                            <span class="shrink-0 text-[11px] font-semibold text-blue-600">+ Add</span>
+                            <h2 class="text-[15px] font-bold text-slate-900">
+                                Notifications
+                                @if($unreadNotifications > 0)
+                                    <span class="ml-1 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white align-middle">{{ $unreadNotifications }}</span>
+                                @endif
+                            </h2>
+                            @if($unreadNotifications > 0)
+                                <form method="POST" action="{{ route('website.account.notifications.read-all') }}">
+                                    @csrf
+                                    <button type="submit" class="shrink-0 text-[11px] font-semibold text-blue-600 hover:underline">Mark all read</button>
+                                </form>
+                            @endif
                         </div>
-                        <div class="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3 min-w-0">
-                            <div class="mb-2 flex items-center justify-between gap-2">
-                                <p class="text-[13px] font-bold text-slate-900">Cash on Delivery</p>
-                                <span class="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">Active</span>
-                            </div>
-                            <p class="text-[11px] text-slate-500 break-words whitespace-normal">Used for current website checkout and synced with admin order updates.</p>
+                        <div class="space-y-2">
+                            @forelse($notifications as $note)
+                                <form method="POST" action="{{ route('website.account.notifications.read', $note->id) }}">
+                                    @csrf
+                                    <button type="submit" class="w-full text-left rounded-xl border px-3 py-2.5 min-w-0 transition {{ $note->read_at ? 'border-slate-100 bg-white' : 'border-blue-100 bg-blue-50/60' }}">
+                                        <span class="flex items-center justify-between gap-2">
+                                            <span class="text-[12.5px] font-bold text-slate-900 truncate">
+                                                @unless($note->read_at)<span class="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-blue-600 align-middle"></span>@endunless
+                                                {{ $note->data['title'] ?? 'Order update' }}
+                                            </span>
+                                            <span class="shrink-0 text-[10px] text-slate-400">{{ $note->created_at->diffForHumans(null, true) }}</span>
+                                        </span>
+                                        <span class="mt-0.5 block text-[11.5px] text-slate-600 break-words">{{ $note->data['body'] ?? '' }}</span>
+                                    </button>
+                                </form>
+                            @empty
+                                <p class="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-center text-[12px] text-slate-400">No notifications yet. Order updates will appear here.</p>
+                            @endforelse
                         </div>
-                        <button type="button" class="acct-info-btn mt-4">View All Payment Methods</button>
                     </div>
                 </div>
             </div>

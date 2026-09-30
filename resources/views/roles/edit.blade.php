@@ -23,7 +23,7 @@
                                    value="{{ $permission->name }}" 
                                    {{ in_array($permission->name, $rolePermissions) ? 'checked' : '' }}
                                    class="rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 w-5 h-5 cursor-pointer">
-                            <span class="ml-3 text-sm font-bold text-gray-700 capitalize">{{ str_replace('_', ' ', $permission->name) }}</span>
+                            <span class="ml-3 text-sm font-bold text-gray-700">{{ \App\Support\StaffPermissions::label($permission->name) }}</span>
                         </label>
                     @endforeach
 

@@ -101,7 +101,6 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $iconPaths['headset'] }}"/></svg>
                     {{ $helpButton }}
                 </a>
-                <p class="mt-3 text-xs text-slate-400">We're here to help you 24/7.</p>
             </div>
         </aside>
 
@@ -158,14 +157,18 @@
 </div>
 
 {{-- Value props --}}
+@if(collect($features ?? [])->isNotEmpty())
 <section class="border-t border-slate-100 bg-slate-50/80">
     <div class="max-w-7xl mx-auto px-4 py-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
-        @foreach([
-            ['title' => 'Fast Shipping', 'text' => 'Get your orders fast with our reliable shipping.', 'icon' => 'truck'],
-            ['title' => 'Easy Returns', 'text' => '30-day easy returns on most products.', 'icon' => 'refresh'],
-            ['title' => 'Secure Payments', 'text' => '100% secure payments with trusted methods.', 'icon' => 'shield'],
-            ['title' => '24/7 Support', 'text' => 'Our support team is always here to help.', 'icon' => 'headset'],
-        ] as $item)
+        @php
+            $promiseIcons = ['truck' => 'truck', 'shipping' => 'truck', 'return' => 'refresh', 'lock' => 'lock', 'support' => 'headset', 'chat' => 'headset'];
+            $promises = collect($features ?? [])->map(fn ($f) => [
+                'title' => $f->title,
+                'text' => (string) $f->subtitle,
+                'icon' => $promiseIcons[$f->icon] ?? 'shield',
+            ]);
+        @endphp
+        @foreach($promises->take(4) as $item)
             <div class="flex gap-3">
                 <span class="w-11 h-11 rounded-full bg-blue-50 text-blue-600 inline-flex items-center justify-center shrink-0">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $iconPaths[$item['icon']] }}"/></svg>
@@ -178,4 +181,5 @@
         @endforeach
     </div>
 </section>
+@endif
 @endsection

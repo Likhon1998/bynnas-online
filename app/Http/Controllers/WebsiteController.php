@@ -780,8 +780,10 @@ class WebsiteController extends Controller
             'customer_address' => 'required|string|max:1000',
             'delivery_zone' => ['nullable', 'string', \Illuminate\Validation\Rule::in($this->delivery->zoneCodes($shopId))],
             'payment_method' => ['nullable', 'string', \Illuminate\Validation\Rule::in($this->delivery->allowedPaymentMethods())],
+            'payment_reference' => 'nullable|required_if:payment_method,confirmation_charge|string|min:4|max:100',
         ], [
             'customer_address.required' => 'Delivery address is required to place your order.',
+            'payment_reference.required_if' => 'Enter the Transaction ID of your confirmation payment.',
         ]);
 
         try {
@@ -792,6 +794,7 @@ class WebsiteController extends Controller
             ], (array) $request->cart, $user, [
                 'zone' => $request->input('delivery_zone'),
                 'payment_method' => $request->input('payment_method'),
+                'payment_reference' => $request->input('payment_reference'),
                 'attribution' => $this->attribution->orderAttributes($request, $shopId),
                 'context' => ['cart_token' => $this->carts->token($request)],
             ]);

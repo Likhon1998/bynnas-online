@@ -7,6 +7,7 @@ use App\Models\Lead;
 use App\Models\LeadActivity;
 use App\Models\Order;
 use App\Models\User;
+use App\Support\OrderStatus;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -172,26 +173,40 @@ class LeadService
         if (! $lead->phone) {
             throw new OrderCreationException('Add a phone number before placing an order.');
         }
-        if ($lead->status === 'converted' && $lead->order_id) {
-            throw new OrderCreationException('This lead already has an order.');
-        }
 
-        $result = $this->orders->place($lead->shop_id, [
-            'name' => $lead->name,
-            'phone' => $lead->phone,
-            'address' => (string) $options['address'],
-            'email' => $lead->email,
-        ], $items, null, [
-            'zone' => $options['zone'] ?? null,
-            'payment_method' => $options['payment_method'] ?? null,
-            'note' => $options['note'] ?? null,
-            'attribution' => $this->attributionFor($lead),
-            'landing_page_id' => $lead->landing_page_id,
-            'lead_id' => $lead->id,
-            'context' => ['lead_id' => $lead->id, 'placed_by' => $by?->id],
-        ]);
+        return DB::transaction(function () use ($lead, $items, $options, $by) {
+            // Row lock: a double-submit must not place two orders for one lead.
+            $locked = Lead::whereKey($lead->id)->lockForUpdate()->firstOrFail();
 
-        return $result['order'];
+            if ($locked->status === 'lost') {
+                throw new OrderCreationException('This lead is marked lost. Change its status before placing an order.');
+            }
+
+            $openOrder = Order::where('lead_id', $locked->id)
+                ->when($locked->order_id, fn ($q) => $q->orWhere('id', $locked->order_id))
+                ->get()
+                ->first(fn (Order $o) => ! OrderStatus::isVoid($o->workflowStatus()));
+            if ($openOrder) {
+                throw new OrderCreationException('This lead already has order '.$openOrder->invoice_no.'.');
+            }
+
+            $result = $this->orders->place($locked->shop_id, [
+                'name' => $locked->name,
+                'phone' => $locked->phone,
+                'address' => (string) $options['address'],
+                'email' => $locked->email,
+            ], $items, null, [
+                'zone' => $options['zone'] ?? null,
+                'payment_method' => $options['payment_method'] ?? null,
+                'note' => $options['note'] ?? null,
+                'attribution' => $this->attributionFor($locked),
+                'landing_page_id' => $locked->landing_page_id,
+                'lead_id' => $locked->id,
+                'context' => ['lead_id' => $locked->id, 'placed_by' => $by?->id],
+            ]);
+
+            return $result['order'];
+        });
     }
 
     /**

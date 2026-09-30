@@ -13,9 +13,15 @@ class OrderInvoiceController extends Controller
      */
     public function show(Order $order)
     {
-        if ($order->shop_id !== Auth::user()->shop_id) {
+        $user = Auth::user();
+        if ((int) $order->shop_id !== (int) $user->shop_id) {
             abort(403, 'Unauthorized Access');
         }
+
+        $allowed = $order->isOnlineOrder()
+            ? $user->can('manage orders')
+            : retail_enabled() && ($user->can('process pos sales') || $user->can('view sales ledger'));
+        abort_unless($allowed || $user->can('view reports'), 403, 'You do not have permission to view this invoice.');
 
         $order->load([
             'items.product.brand',
@@ -29,7 +35,7 @@ class OrderInvoiceController extends Controller
 
         $returnProduct = null;
         if ($order->is_exchange_receipt && $order->return_product_id) {
-            $returnProduct = Product::with(['brand', 'category'])->find($order->return_product_id);
+            $returnProduct = Product::with(['brand', 'category'])->where('shop_id', $order->shop_id)->find($order->return_product_id);
         }
 
         return view('pos.receipt', compact('order', 'returnProduct'));

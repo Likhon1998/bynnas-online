@@ -44,35 +44,50 @@ class WebsiteService
     public function homeCopyDefaults(?array $saved = null): array
     {
         $defaults = [
-            'categories_eyebrow' => 'Curated collections',
+            'logo_tagline' => '',
+            'hero_badge' => '',
+            'hero_title' => 'Welcome to {store}',
+            'hero_subtitle' => 'Browse the collection and order online with delivery to your door.',
+            'hero_trust_1_title' => '',
+            'hero_trust_1_sub' => '',
+            'hero_trust_2_title' => '',
+            'hero_trust_2_sub' => '',
+            'hero_trust_3_title' => '',
+            'hero_trust_3_sub' => '',
             'categories_title' => 'Shop by',
             'categories_title_accent' => 'Category',
             'categories_subtitle' => 'Everything you love, sorted by category — browse the collection.',
-            'flash_eyebrow' => 'Limited time',
             'flash_title' => 'Flash',
             'flash_title_accent' => 'Sale',
             'flash_subtitle' => 'Today’s best prices on selected products — ends when the timer hits zero.',
-            'new_eyebrow' => 'Just landed',
+            'featured_title' => 'Featured Products',
+            'featured_subtitle' => 'Hand-picked products from our collection.',
+            'combo_title' => 'Combo Deals',
+            'combo_subtitle' => 'Bundles that save you more.',
+            'why_title' => 'Why Shop with {store}',
+            'why_subtitle' => '',
+            'why_badge' => '',
             'new_title' => 'New',
             'new_title_accent' => 'Arrivals',
             'new_subtitle' => 'Fresh arrivals added to the store — explore what’s new this week.',
-            'trending_eyebrow' => 'Most loved',
-            'trending_title' => "What's",
-            'trending_title_accent' => 'Trending',
-            'trending_subtitle' => 'Customer favorites — grab them before they sell out.',
-            'brands_eyebrow' => 'Partners',
             'brands_title' => 'Brands We',
             'brands_title_accent' => 'Carry',
             'brands_subtitle' => 'Trusted brands — shop your favorites.',
             'reviews_title' => 'What Our Customers Say',
-            'reviews_subtitle' => 'Real feedback from shoppers who bought with us.',
-            'blog_eyebrow' => 'From the journal',
+            'reviews_subtitle' => 'Feedback from our customers.',
             'blog_title' => 'Latest from the',
             'blog_title_accent' => 'Blog',
-            'blog_subtitle' => 'Guides, reviews, and tips from the Bynnas Social team.',
+            'blog_subtitle' => 'Guides, tips and stories from the {store} team.',
         ];
 
-        return array_merge($defaults, array_filter($saved ?? [], fn ($v) => $v !== null && $v !== ''));
+        // Old default that hard-coded a store name; treat it as unset so {store} applies.
+        $legacy = ['blog_subtitle' => 'Guides, reviews, and tips from the Bynnas Social team.'];
+
+        return array_merge($defaults, array_filter(
+            $saved ?? [],
+            fn ($v, $k) => $v !== null && $v !== '' && ($legacy[$k] ?? null) !== $v,
+            ARRAY_FILTER_USE_BOTH
+        ));
     }
 
     public function settings(): object
@@ -101,15 +116,16 @@ class WebsiteService
             'favicon_path' => $site->favicon_path,
             'currency_code' => $currencyCode,
             'currency_symbol' => $currencySymbol,
-            'special_offer_text' => $site->special_offer_text ?: 'Special Offer!',
-            'trusted_by_text' => $site->trusted_by_text ?: 'Trusted by thousands of customers',
-            'footer_tagline' => $site->footer_tagline ?: 'Your one-stop shop for trending products, delivered to your door.',
+            'special_offer_text' => $site->special_offer_text,
+            'trusted_by_text' => $site->trusted_by_text,
+            'footer_tagline' => $site->footer_tagline,
             'home_copy' => $this->homeCopyDefaults($site->home_copy ?? []),
             'deals_kicker' => $site->deals_kicker ?: 'Special Offers',
             'deals_title' => $site->deals_title ?: "Deals You'll",
             'deals_title_accent' => $site->deals_title_accent ?: 'Love',
             'deals_subtitle' => $site->deals_subtitle ?: 'Grab the best deals on top-quality products.',
-            'contact_email' => $site->contact_email ?: $shop?->email,
+            // No fallback to the shop record: its email is the admin login.
+            'contact_email' => $site->contact_email,
             'contact_phone' => $site->contact_phone ?: $shop?->phone,
             'contact_address' => $site->contact_address ?: $shop?->address,
             'social_links' => $site->social_links ?? [],
@@ -182,6 +198,19 @@ class WebsiteService
                 ->get(),
             16
         );
+
+        $featuredProducts = $this->dedupeVariantCollection(
+            $this->catalogQuery($shopId)
+                ->with(['category', 'brand'])
+                ->where('is_featured', true)
+                ->latest('id')
+                ->take(48)
+                ->get(),
+            16
+        );
+        if ($featuredProducts->isEmpty()) {
+            $featuredProducts = $bestSellers;
+        }
 
         $flashSaleProducts = $this->dedupeVariantCollection(
             $this->catalogQuery($shopId)
@@ -274,6 +303,7 @@ class WebsiteService
                 ->take(12)
                 ->get(),
             'bestSellers' => $bestSellers,
+            'featuredProducts' => $featuredProducts,
             'flashSaleProducts' => $flashSaleProducts,
             'flashSaleEndsAt' => $flashSaleEndsAt,
             'newArrivals' => $newArrivals,
@@ -302,6 +332,7 @@ class WebsiteService
             'heroSideCards' => collect(),
             'midPromoBanners' => collect(),
             'bestSellers' => collect(),
+            'featuredProducts' => collect(),
             'flashSaleProducts' => collect(),
             'flashSaleEndsAt' => null,
             'newArrivals' => collect(),
@@ -587,10 +618,15 @@ class WebsiteService
     {
         $urls = $this->productImageUrls($product);
 
-        return $urls[0] ?? 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&q=80';
+        return $urls[0] ?? $this->placeholderImageUrl();
     }
 
-    /** All product gallery URLs (uploaded images, then config/fallback). */
+    public function placeholderImageUrl(): string
+    {
+        return asset('images/placeholder-product.svg');
+    }
+
+    /** All product gallery URLs (uploaded images, then a local placeholder). */
     public function productImageUrls($product): array
     {
         $urls = [];
@@ -602,16 +638,7 @@ class WebsiteService
         }
 
         if ($urls === []) {
-            $fallback = config('website_assets.products.' . $product->barcode)
-                ?? config('website_assets.products.' . \Illuminate\Support\Str::slug($product->name));
-
-            // Prefer a stable per-product placeholder so New Arrivals never all look identical.
-            if (! $fallback) {
-                $seed = abs(crc32((string) ($product->barcode ?: $product->sku ?: $product->id ?: $product->name)));
-                $fallback = 'https://picsum.photos/seed/product'.$seed.'/500/500';
-            }
-
-            $urls[] = $fallback;
+            $urls[] = $this->placeholderImageUrl();
         }
 
         return $urls;

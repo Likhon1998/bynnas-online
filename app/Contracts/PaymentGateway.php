@@ -2,7 +2,7 @@
 
 namespace App\Contracts;
 
-use App\Models\Order;
+use App\Models\PaymentTransaction;
 use Illuminate\Http\Request;
 
 /**
@@ -14,13 +14,16 @@ interface PaymentGateway
     /** @param  array<string, mixed>  $credentials */
     public function __construct(array $credentials, bool $sandbox);
 
-    /** Start a payment for the order; returns the URL to send the customer to. */
-    public function initiate(Order $order, float $amount): string;
+    /**
+     * Start a payment for the transaction; returns the URL to send the customer to.
+     * The gateway must return the customer to $callbackUrl.
+     */
+    public function initiate(PaymentTransaction $transaction, string $callbackUrl): string;
 
     /**
-     * Verify the gateway callback server-side.
+     * Verify the gateway callback server-side (never trust query parameters alone).
      *
-     * @return array{paid: bool, amount: float, reference: ?string}
+     * @return array{paid: bool, amount: float, reference: ?string, payload?: array<string, mixed>, reason?: ?string}
      */
-    public function verify(Order $order, Request $request): array;
+    public function verify(PaymentTransaction $transaction, Request $request): array;
 }

@@ -107,14 +107,17 @@ class AbandonedCartService
 
         $cart = $token ? (clone $open)->where('token', $token)->first() : null;
 
+        // Without the cookie, only a recent cart counts; an old one was not what this order recovered.
+        $recent = (clone $open)->where('last_activity_at', '>=', now()->subDays(14));
+
         if (! $cart && $order->customer_id) {
-            $cart = (clone $open)->where('customer_id', $order->customer_id)->latest('last_activity_at')->first();
+            $cart = (clone $recent)->where('customer_id', $order->customer_id)->latest('last_activity_at')->first();
         }
 
         if (! $cart && $order->delivery_phone) {
             $normalized = Customer::normalizePhone($order->delivery_phone);
             if (strlen($normalized) >= 8) {
-                $cart = (clone $open)->where('phone', 'like', '%'.substr($normalized, -6))
+                $cart = (clone $recent)->where('phone', 'like', '%'.substr($normalized, -6))
                     ->latest('last_activity_at')->get()
                     ->first(fn (AbandonedCart $c) => Customer::normalizePhone($c->phone) === $normalized);
             }

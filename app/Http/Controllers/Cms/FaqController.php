@@ -140,7 +140,7 @@ class FaqController extends Controller
         $data = $request->validate([
             'question' => 'required|string|max:500',
             'answer' => 'required|string',
-            'category_id' => 'nullable|exists:cms_faq_categories,id',
+            'category_id' => ['nullable', \Illuminate\Validation\Rule::exists('cms_faq_categories', 'id')->where('shop_id', $this->shopId())],
             'sort_order' => 'nullable|integer|min:0',
         ]);
         $data['is_published'] = $request->boolean('is_published');

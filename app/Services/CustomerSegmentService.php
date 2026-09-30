@@ -21,6 +21,7 @@ class CustomerSegmentService
         'high_value' => 'High value',
         'frequent' => 'Frequent buyer',
         'inactive' => 'Inactive',
+        'cod_risk' => 'COD risk',
     ];
 
     public const BADGES = [
@@ -30,9 +31,10 @@ class CustomerSegmentService
         'high_value' => 'bg-emerald-100 text-emerald-800',
         'frequent' => 'bg-violet-100 text-violet-800',
         'inactive' => 'bg-slate-200 text-slate-600',
+        'cod_risk' => 'bg-rose-100 text-rose-800',
     ];
 
-    /** Adds seg_orders, seg_spent, seg_first_order_at, seg_last_order_at to a customer query. */
+    /** Adds seg_orders, seg_spent, seg_first_order_at, seg_last_order_at, seg_returns to a customer query. */
     public function withStats(Builder $query): Builder
     {
         $valid = fn () => Order::query()
@@ -48,6 +50,10 @@ class CustomerSegmentService
             'seg_spent' => $valid()->selectRaw('COALESCE(SUM(orders.total_amount - COALESCE(orders.delivery_charge, 0)), 0)'),
             'seg_first_order_at' => $valid()->selectRaw('MIN(orders.created_at)'),
             'seg_last_order_at' => $valid()->selectRaw('MAX(orders.created_at)'),
+            'seg_returns' => Order::query()
+                ->whereColumn('orders.customer_id', 'customers.id')
+                ->whereIn('orders.status', [OrderStatus::RETURNED, OrderStatus::RETURN_REQUESTED])
+                ->selectRaw('COUNT(*)'),
         ]);
     }
 
@@ -79,16 +85,19 @@ class CustomerSegmentService
         if ($orders > 0 && $stats['last_order_at']?->lt(now()->subDays((int) $rules['inactive_days']))) {
             $segments[] = 'inactive';
         }
+        if ($stats['returns'] >= (int) ($rules['cod_risk_returns'] ?? 2)) {
+            $segments[] = 'cod_risk';
+        }
 
         return $segments;
     }
 
-    /** @return array{orders: int, spent: float, first_order_at: ?Carbon, last_order_at: ?Carbon, average: float} */
+    /** @return array{orders: int, spent: float, first_order_at: ?Carbon, last_order_at: ?Carbon, average: float, returns: int} */
     public function stats(Customer $customer): array
     {
         if (! array_key_exists('seg_orders', $customer->getAttributes())) {
             $loaded = $this->withStats(Customer::query()->whereKey($customer->id))->first();
-            foreach (['seg_orders', 'seg_spent', 'seg_first_order_at', 'seg_last_order_at'] as $key) {
+            foreach (['seg_orders', 'seg_spent', 'seg_first_order_at', 'seg_last_order_at', 'seg_returns'] as $key) {
                 $customer->setAttribute($key, $loaded?->getAttribute($key));
             }
         }
@@ -102,6 +111,7 @@ class CustomerSegmentService
             'first_order_at' => $this->date($customer->getAttribute('seg_first_order_at')),
             'last_order_at' => $this->date($customer->getAttribute('seg_last_order_at')),
             'average' => $orders > 0 ? round($spent / $orders, 2) : 0.0,
+            'returns' => (int) $customer->getAttribute('seg_returns'),
         ];
     }
 

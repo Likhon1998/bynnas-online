@@ -46,7 +46,29 @@ class CampaignAttributionService
         'google.com' => 'google',
     ];
 
+    /** utm_campaign used by the Share buttons on product pages. */
+    public const PRODUCT_SHARE = 'product_share';
+
     public function __construct(private WebsiteService $website) {}
+
+    /**
+     * Shares are tracked through a normal campaign so clicks, orders and revenue
+     * show up in Campaigns; the per-network split stays in utm_source.
+     */
+    public function productShareCampaign(int $shopId): Campaign
+    {
+        return Campaign::firstOrCreate(
+            ['shop_id' => $shopId, 'utm_campaign' => self::PRODUCT_SHARE],
+            [
+                'name' => 'Product shares',
+                'source' => 'other',
+                'medium' => 'organic_social',
+                'landing_type' => 'shop',
+                'status' => 'active',
+                'notes' => 'Created automatically for the Share buttons on product pages (Facebook, Messenger, WhatsApp, copied link).',
+            ]
+        );
+    }
 
     public function isBot(Request $request): bool
     {
@@ -94,6 +116,9 @@ class CampaignAttributionService
             $campaign = ($shopId && $utmCampaign)
                 ? Campaign::where('shop_id', $shopId)->where('utm_campaign', $utmCampaign)->first()
                 : null;
+            if (! $campaign && $shopId && $utmCampaign === self::PRODUCT_SHARE) {
+                $campaign = $this->productShareCampaign($shopId);
+            }
             $content = $this->clean($request->query('utm_content'), 120);
 
             if ($campaign && $campaign->isTracking()) {

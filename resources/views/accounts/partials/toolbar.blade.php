@@ -8,6 +8,9 @@
         'petty-cash' => ['route' => 'accounts.petty-cash', 'label' => 'Petty Cash'],
         'transfer' => ['route' => 'accounts.transfer', 'label' => 'Account Transfer'],
     ];
+    if (! retail_enabled()) {
+        unset($tabs['daily-summary']);
+    }
 
     $tabParams = function (string $key): array {
         return match ($key) {

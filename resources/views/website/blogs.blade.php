@@ -5,30 +5,30 @@
     $heroKicker = data_get($settings, 'blog_hero_kicker') ?: 'OUR BLOG';
     $heroTitle = data_get($settings, 'blog_hero_title') ?: 'News & Articles';
     $heroSub = data_get($settings, 'blog_hero_subtitle')
-        ?: 'Stay updated with the latest tech news, product reviews, and buying guides from '.$storeName.'.';
+        ?: 'News, guides and updates from '.$storeName.'.';
     $heroImage = data_get($settings, 'blog_hero_image')
         ? public_storage_url(data_get($settings, 'blog_hero_image'))
-        : 'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=1600&q=80';
+        : null;
     $articlesTitle = data_get($settings, 'blog_articles_title') ?: 'Latest Articles';
     $newsletterTitle = data_get($settings, 'blog_newsletter_title') ?: 'Subscribe to Our Newsletter';
-    $newsletterText = data_get($settings, 'blog_newsletter_text') ?: 'Get the latest deals and tech news delivered to your inbox.';
-    $features = [
+    $newsletterText = data_get($settings, 'blog_newsletter_text') ?: 'Get new offers and articles delivered to your inbox.';
+    $features = array_values(array_filter([
         [
-            'title' => data_get($settings, 'blog_feature_1_title') ?: 'Expert Reviews',
-            'text' => data_get($settings, 'blog_feature_1_text') ?: 'In-depth & honest',
+            'title' => data_get($settings, 'blog_feature_1_title'),
+            'text' => data_get($settings, 'blog_feature_1_text'),
             'icon' => 'review',
         ],
         [
-            'title' => data_get($settings, 'blog_feature_2_title') ?: 'Buying Guides',
-            'text' => data_get($settings, 'blog_feature_2_text') ?: 'Smart picks for you',
+            'title' => data_get($settings, 'blog_feature_2_title'),
+            'text' => data_get($settings, 'blog_feature_2_text'),
             'icon' => 'guide',
         ],
         [
-            'title' => data_get($settings, 'blog_feature_3_title') ?: 'Latest Updates',
-            'text' => data_get($settings, 'blog_feature_3_text') ?: 'Tech news, trends & more',
+            'title' => data_get($settings, 'blog_feature_3_title'),
+            'text' => data_get($settings, 'blog_feature_3_text'),
             'icon' => 'updates',
         ],
-    ];
+    ], fn ($f) => filled($f['title'])));
     $blogCategories = $blogCategories ?? collect();
     $popularPosts = $popularPosts ?? collect();
     $blogSearch = $blogSearch ?? null;
@@ -56,7 +56,9 @@
 {{-- Hero --}}
 <section class="relative overflow-hidden border-b border-slate-100">
     <div class="absolute inset-0">
-        <img src="{{ $heroImage }}" alt="" class="h-full w-full object-cover object-center opacity-35">
+        @if($heroImage)
+            <img src="{{ $heroImage }}" alt="" class="h-full w-full object-cover object-center opacity-35">
+        @endif
         <div class="absolute inset-0 bg-gradient-to-r from-slate-100 via-slate-50/92 to-transparent"></div>
     </div>
     <div class="relative max-w-7xl mx-auto px-4 py-7 sm:py-8">
@@ -141,7 +143,7 @@
                         </div>
                     </article>
                 @empty
-                    <p class="sm:col-span-2 xl:col-span-3 text-center text-slate-400 py-10 text-xs">No blog posts yet. Add posts from Admin → CMS → Blogs.</p>
+                    <p class="sm:col-span-2 xl:col-span-3 text-center text-slate-400 py-10 text-xs">No articles yet — check back soon.</p>
                 @endforelse
             </div>
 

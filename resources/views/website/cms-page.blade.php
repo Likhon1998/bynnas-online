@@ -1,5 +1,8 @@
 @extends('website.layout')
 
+@section('title', ($page->meta_title ?: $page->title).' — '.($settings->store_name ?? config('app.name', 'Bynnas Social')))
+@section('meta_description', $page->meta_description ?: ($page->excerpt ?: \Illuminate\Support\Str::limit(strip_tags((string) $page->body), 160)))
+
 @section('content')
 <div class="max-w-3xl mx-auto px-4 py-12">
     <p class="text-sm text-slate-400 mb-2"><a href="{{ route('home') }}" class="hover:text-slate-700">Home</a> / Page</p>

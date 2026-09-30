@@ -1,4 +1,4 @@
-<x-supply-layout :title="'PO ' . $order->po_number" :subtitle="'Supplier: ' . ($order->supplier->name ?? '—') . ' · Stock syncs to POS & web on receive.'">
+<x-supply-layout :title="'PO ' . $order->po_number" :subtitle="'Supplier: ' . ($order->supplier->name ?? '—') . (retail_enabled() ? ' · Stock syncs to POS & web on receive.' : ' · Stock syncs to the online store on receive.')">
     <div class="grid md:grid-cols-4 gap-4 mb-6">
         <div class="bg-white rounded-2xl border p-4">
             <p class="text-xs text-gray-400 uppercase font-bold">Supplier</p>
@@ -46,7 +46,7 @@
             <div class="px-5 py-4 border-b bg-slate-50 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
                 <div>
                     <h3 class="font-bold text-gray-900">Receive stock</h3>
-                    <p class="text-xs text-gray-500 mt-1">Store = sellable on POS &amp; web. Warehouse = held until Stock Transfer.</p>
+                    <p class="text-xs text-gray-500 mt-1">Store = sellable on {{ retail_enabled() ? 'POS & web' : 'the online store' }}. Warehouse = held until Stock Transfer.</p>
                 </div>
                 <div class="sm:w-64">
                     <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Receive into</label>
@@ -103,7 +103,7 @@
         </form>
     @elseif($order->status === 'received')
         <div class="p-6 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-800 font-semibold mb-8">
-            Fully received. Stock is available on POS and the online store.
+            Fully received. Stock is available on {{ retail_enabled() ? 'POS and ' : '' }}the online store.
             <span class="block mt-2 text-sm font-medium text-emerald-700">
                 Got extra units? Use <a href="{{ route('supply.purchase-returns.create', ['purchase_order_id' => $order->id]) }}" class="underline font-bold">Return excess to supplier</a>.
             </span>

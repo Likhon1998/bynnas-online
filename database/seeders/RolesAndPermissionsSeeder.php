@@ -23,6 +23,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage website',
             'manage campaigns',
             'manage leads',
+            'manage orders',
+            'manage customers',
+            'view reports',
+            'manage accounts',
         ];
 
         foreach ($permissions as $permission) {
@@ -34,6 +38,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view dashboard',
             'process pos sales',
             'view sales ledger',
+            'manage customers',
         ]);
 
         $managerRole = Role::firstOrCreate(['name' => 'Manager', 'guard_name' => 'web']);
@@ -45,6 +50,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage website',
             'manage campaigns',
             'manage leads',
+            'manage orders',
+            'manage customers',
         ]);
 
         $shopOwnerRole = Role::firstOrCreate(['name' => 'Shop Owner', 'guard_name' => 'web']);

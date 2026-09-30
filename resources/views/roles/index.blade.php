@@ -37,15 +37,17 @@
                         </td>
                         <td class="p-4">
                             <div class="flex flex-wrap gap-2">
-                                @foreach($role->permissions as $permission)
-                                    <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">
-                                        {{ str_replace('_', ' ', $permission->name) }}
+                                @forelse($role->permissions->whereIn('name', $visible) as $permission)
+                                    <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-1 rounded text-xs font-bold">
+                                        {{ \App\Support\StaffPermissions::label($permission->name) }}
                                     </span>
-                                @endforeach
+                                @empty
+                                    <span class="text-xs text-gray-400">No staff permissions</span>
+                                @endforelse
                             </div>
                         </td>
                         <td class="p-4 text-right">
-                            @if($role->name !== 'Shop Owner')
+                            @if(! in_array($role->name, ['Shop Owner', 'Customer'], true))
                                 <a href="{{ route('roles.edit', $role->id) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded-md text-sm font-bold text-gray-700 hover:bg-gray-50 hover:text-indigo-600 transition shadow-sm">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                                     Edit

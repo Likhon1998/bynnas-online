@@ -150,16 +150,19 @@
                 </div>
                 <div>
                     <label class="text-xs font-bold uppercase text-slate-500">Special offer text</label>
-                    <input name="special_offer_text" value="{{ old('special_offer_text', $settings->special_offer_text) }}" class="mt-1 w-full rounded-xl border-slate-200">
+                    <input name="special_offer_text" value="{{ old('special_offer_text', $settings->special_offer_text) }}" class="mt-1 w-full rounded-xl border-slate-200" placeholder="Free delivery over ৳2,000">
+                    <p class="mt-1 text-[11px] text-slate-500">Announcement strip at the very top of every page. Leave empty to hide it.</p>
                 </div>
                 <div>
                     <label class="text-xs font-bold uppercase text-slate-500">Trusted-by text</label>
-                    <input name="trusted_by_text" value="{{ old('trusted_by_text', $settings->trusted_by_text) }}" class="mt-1 w-full rounded-xl border-slate-200" placeholder="Shown under homepage features">
+                    <input name="trusted_by_text" value="{{ old('trusted_by_text', $settings->trusted_by_text) }}" class="mt-1 w-full rounded-xl border-slate-200" placeholder="Trusted by thousands of families">
+                    <p class="mt-1 text-[11px] text-slate-500">Shown under the homepage features (“Why choose us”).</p>
                 </div>
                 <div class="md:col-span-2">
                     <label class="text-xs font-bold uppercase text-slate-500">Footer tagline</label>
                     <input name="footer_tagline" value="{{ old('footer_tagline', $settings->footer_tagline) }}" class="mt-1 w-full rounded-xl border-slate-200" placeholder="Your one-stop shop for trending products…">
                 </div>
+                <div class="md:col-span-2 -mb-1 text-[11px] text-slate-500">The four deals fields head the <b>Deal banners</b> section on the homepage.</div>
                 <div>
                     <label class="text-xs font-bold uppercase text-slate-500">Deals kicker</label>
                     <input name="deals_kicker" value="{{ old('deals_kicker', $settings->deals_kicker) }}" class="mt-1 w-full rounded-xl border-slate-200" placeholder="This week">
@@ -184,41 +187,47 @@
 
         @php $homeCopy = old('home_copy', $settings->home_copy ?? []); @endphp
         <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 class="text-base font-bold text-slate-900">Homepage section titles</h3>
-            <p class="text-sm text-slate-500 mt-0.5">Eyebrows, titles, and subtitles for Flash / New / Trending / Brands / Reviews / Blog / Categories.</p>
-            <div class="mt-4 grid gap-3 md:grid-cols-2">
-                @foreach([
-                    'categories_eyebrow' => 'Categories eyebrow',
-                    'categories_title' => 'Categories title',
-                    'categories_title_accent' => 'Categories accent',
-                    'categories_subtitle' => 'Categories subtitle',
-                    'flash_eyebrow' => 'Flash eyebrow',
-                    'flash_title' => 'Flash title',
-                    'flash_title_accent' => 'Flash accent',
-                    'flash_subtitle' => 'Flash subtitle',
-                    'new_eyebrow' => 'New arrivals eyebrow',
-                    'new_title' => 'New arrivals title',
-                    'new_title_accent' => 'New arrivals accent',
-                    'new_subtitle' => 'New arrivals subtitle',
-                    'trending_eyebrow' => 'Trending eyebrow',
-                    'trending_title' => 'Trending title',
-                    'trending_title_accent' => 'Trending accent',
-                    'trending_subtitle' => 'Trending subtitle',
-                    'brands_eyebrow' => 'Brands eyebrow',
-                    'brands_title' => 'Brands title',
-                    'brands_title_accent' => 'Brands accent',
-                    'brands_subtitle' => 'Brands subtitle',
-                    'reviews_title' => 'Reviews title',
-                    'reviews_subtitle' => 'Reviews subtitle',
-                    'blog_eyebrow' => 'Blog eyebrow',
-                    'blog_title' => 'Blog title',
-                    'blog_title_accent' => 'Blog accent',
-                    'blog_subtitle' => 'Blog subtitle',
-                ] as $key => $label)
-                    <div class="{{ str_ends_with($key, 'subtitle') ? 'md:col-span-2' : '' }}">
-                        <label class="text-[11px] font-bold uppercase text-slate-500">{{ $label }}</label>
-                        <input name="home_copy[{{ $key }}]" value="{{ old('home_copy.'.$key, $homeCopy[$key] ?? '') }}" class="mt-1 w-full rounded-xl border-slate-200 text-sm">
-                    </div>
+            <h3 class="text-base font-bold text-slate-900">Homepage text</h3>
+            <p class="text-sm text-slate-500 mt-0.5">Every heading on the homepage, top to bottom. Leave a field empty to use the default shown in grey. Write <code>{store}</code> to insert the store name.</p>
+            @php
+                $copyDefaults = app(\App\Services\WebsiteService::class)->homeCopyDefaults();
+                $copyGroups = [
+                    'Logo & hero' => [
+                        'logo_tagline' => 'Tagline under the logo (type - to hide)',
+                        'hero_badge' => 'Hero badge',
+                        'hero_title' => 'Hero headline',
+                        'hero_subtitle' => 'Hero subtitle',
+                        'hero_trust_1_title' => 'Trust point 1',
+                        'hero_trust_1_sub' => 'Trust point 1 detail',
+                        'hero_trust_2_title' => 'Trust point 2',
+                        'hero_trust_2_sub' => 'Trust point 2 detail',
+                        'hero_trust_3_title' => 'Trust point 3',
+                        'hero_trust_3_sub' => 'Trust point 3 detail',
+                    ],
+                    'Categories' => ['categories_title' => 'Title', 'categories_title_accent' => 'Accent word', 'categories_subtitle' => 'Subtitle'],
+                    'Flash sale' => ['flash_title' => 'Title', 'flash_title_accent' => 'Accent word', 'flash_subtitle' => 'Subtitle'],
+                    'Featured products' => ['featured_title' => 'Title', 'featured_subtitle' => 'Subtitle'],
+                    'Combo deals' => ['combo_title' => 'Title', 'combo_subtitle' => 'Subtitle'],
+                    'Why choose us' => ['why_title' => 'Title', 'why_badge' => 'Photo badge', 'why_subtitle' => 'Subtitle'],
+                    'New arrivals' => ['new_title' => 'Title', 'new_title_accent' => 'Accent word', 'new_subtitle' => 'Subtitle'],
+                    'Brands' => ['brands_title' => 'Title', 'brands_title_accent' => 'Accent word', 'brands_subtitle' => 'Subtitle'],
+                    'Customer reviews' => ['reviews_title' => 'Title', 'reviews_subtitle' => 'Subtitle'],
+                    'Blog' => ['blog_title' => 'Title', 'blog_title_accent' => 'Accent word', 'blog_subtitle' => 'Subtitle'],
+                ];
+            @endphp
+            <div class="mt-4 space-y-4">
+                @foreach($copyGroups as $group => $fields)
+                    <fieldset class="rounded-xl border border-slate-100 p-3">
+                        <legend class="px-1 text-xs font-bold text-slate-700">{{ $group }}</legend>
+                        <div class="grid gap-3 md:grid-cols-2">
+                            @foreach($fields as $key => $label)
+                                <div class="{{ str_ends_with($key, 'subtitle') ? 'md:col-span-2' : '' }}">
+                                    <label class="text-[11px] font-bold uppercase text-slate-500">{{ $label }}</label>
+                                    <input name="home_copy[{{ $key }}]" value="{{ old('home_copy.'.$key, $homeCopy[$key] ?? '') }}" placeholder="{{ $copyDefaults[$key] ?? '' }}" class="mt-1 w-full rounded-xl border-slate-200 text-sm">
+                                </div>
+                            @endforeach
+                        </div>
+                    </fieldset>
                 @endforeach
             </div>
         </div>
@@ -226,8 +235,8 @@
         <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div class="flex items-center justify-between gap-3">
                 <div>
-                    <h3 class="text-base font-bold text-slate-900">Homepage features</h3>
-                    <p class="text-sm text-slate-500">Trust bar under the hero. Recommended: <strong>4 items</strong>. Fully CMS-managed — edits show on the storefront.</p>
+                    <h3 class="text-base font-bold text-slate-900">Store promises</h3>
+                    <p class="text-sm text-slate-500">Delivery, returns, payment and support promises. Shown in “Why choose us” on the homepage, under Add to cart on every product page, and on the FAQ page. Use <strong>4 items</strong> and only promise what you really offer.</p>
                 </div>
                 <button type="button" @click="addFeature()" class="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">+ Feature</button>
             </div>

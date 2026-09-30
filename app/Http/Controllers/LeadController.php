@@ -127,7 +127,7 @@ class LeadController extends Controller
             ? $lead->customer->orders()->latest('id')->limit(10)->get(['id', 'invoice_no', 'status', 'total_amount', 'created_at', 'lead_id'])
             : collect();
 
-        $settings = \App\Models\SiteSetting::where('shop_id', $shopId)->first();
+        $settings = \App\Models\SiteSetting::current();
         $deliveryConfig = $this->delivery->publicConfig($settings, $shopId);
 
         return view('leads.show', [

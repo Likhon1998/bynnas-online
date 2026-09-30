@@ -47,16 +47,13 @@ class ProductionSeeder extends Seeder
             'social_links' => null,
             'delivery_inside_dhaka' => 60,
             'delivery_outside_dhaka' => 120,
-            'delivery_free_enabled' => true,
-            'delivery_free_min_amount' => 10000,
+            'delivery_free_enabled' => false,
+            'delivery_free_min_amount' => 0,
             'delivery_cod_enabled' => true,
             'delivery_confirmation_enabled' => false,
             'delivery_confirmation_amount' => 0,
         ])->save();
 
-        // Homepage mid-promo strip (3 continuous banners) — editable in CMS → Landing Page
-        $this->call(MidPromoBannerSeeder::class);
-
-        $this->command?->info('Production ready: admin + mid promo banners (CMS editable).');
+        $this->command?->info('Production ready: roles, shop and admin. Add banners and content in CMS.');
     }
 }

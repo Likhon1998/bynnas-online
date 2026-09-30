@@ -11,7 +11,7 @@
             <a href="{{ route('customers.index') }}" class="text-[12px] font-semibold text-indigo-600 hover:text-indigo-700">← Back to customers</a>
             <div class="mt-1.5 flex flex-wrap items-center gap-2">
                 <h1 class="text-xl font-extrabold tracking-tight text-slate-900">{{ $customer->name }}</h1>
-                <span class="inline-flex rounded px-1.5 py-0.5 text-[10px] font-bold uppercase {{ $customer->user_id ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-700' }}">{{ $customer->user_id ? 'Online account' : 'Guest / walk-in' }}</span>
+                <span class="inline-flex rounded px-1.5 py-0.5 text-[10px] font-bold uppercase {{ $customer->user_id ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-700' }}">{{ $customer->user_id ? 'Online account' : 'Guest (no account)' }}</span>
                 @foreach($segments as $segment)
                     <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold {{ $segmentBadges[$segment] }}">{{ $segmentLabels[$segment] }}</span>
                 @endforeach
@@ -27,15 +27,18 @@
             <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Orders</p>
             <p class="mt-1 text-2xl font-extrabold text-slate-900">{{ $stats['orders'] }}</p>
             <p class="text-[11px] text-slate-500">Excludes cancelled / returned / refunded</p>
+            @if($stats['returns'] > 0)
+                <p class="text-[11px] font-semibold text-rose-600">{{ $stats['returns'] }} returned / refused</p>
+            @endif
         </div>
         <div class="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
             <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Total spent</p>
-            <p class="mt-1 text-2xl font-extrabold text-emerald-700">Tk {{ format_taka_number($stats['spent']) }}</p>
+            <p class="mt-1 text-2xl font-extrabold text-emerald-700">{{ format_taka($stats['spent']) }}</p>
             <p class="text-[11px] text-slate-500">Excluding delivery fees</p>
         </div>
         <div class="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
             <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Average order</p>
-            <p class="mt-1 text-2xl font-extrabold text-slate-900">Tk {{ format_taka_number($stats['average']) }}</p>
+            <p class="mt-1 text-2xl font-extrabold text-slate-900">{{ format_taka($stats['average']) }}</p>
         </div>
         <div class="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
             <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Last order</p>
@@ -64,18 +67,18 @@
                         @endphp
                         <tr>
                             <td class="px-3 py-2">
-                                @if($isOnline && auth()->user()->isAdminUser())
+                                @if($isOnline && auth()->user()->can('manage orders'))
                                     <a href="{{ route('online-orders.show', $order) }}" class="font-semibold text-indigo-600 hover:underline">{{ $order->invoice_no }}</a>
                                 @else
                                     <span class="font-semibold text-slate-800">{{ $order->invoice_no }}</span>
                                 @endif
                                 <p class="text-[10px] text-slate-400">{{ $order->created_at->format('d M Y, h:i A') }}</p>
                             </td>
-                            <td class="px-3 py-2">{{ $isOnline ? 'Online' : 'Counter' }}{{ $order->lead_id ? ' · lead' : '' }}{{ $order->utm_source ? ' · '.$order->utm_source : '' }}</td>
+                            <td class="px-3 py-2">{{ $isOnline ? 'Online' : 'In-store (legacy)' }}{{ $order->lead_id ? ' · lead' : '' }}{{ $order->utm_source ? ' · '.$order->utm_source : '' }}</td>
                             <td class="px-3 py-2">
                                 <span class="inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold {{ $badgeClasses[$status] ?? 'bg-slate-100 text-slate-700 border-slate-200' }}">{{ $statusLabels[$status] ?? ucfirst((string) $order->status) }}</span>
                             </td>
-                            <td class="px-3 py-2 text-right font-semibold">Tk {{ format_taka_number((float) $order->total_amount) }}</td>
+                            <td class="px-3 py-2 text-right font-semibold">{{ format_taka((float) $order->total_amount) }}</td>
                         </tr>
                     @empty
                         <tr><td colspan="4" class="px-4 py-8 text-center text-slate-400">No orders yet.</td></tr>
@@ -100,6 +103,18 @@
                         <p class="text-[12px] text-slate-400">No leads for this customer.</p>
                     @endforelse
                 </div>
+
+                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <h2 class="mb-2 text-[14px] font-bold text-slate-900">Carts</h2>
+                    @forelse($carts as $cart)
+                        <a href="{{ route('abandoned-carts.show', $cart) }}" class="flex items-center justify-between border-t border-slate-100 py-1.5 text-[12px] first:border-0 hover:text-indigo-700">
+                            <span>{{ $cart->item_count }} {{ \Illuminate\Support\Str::plural('item', $cart->item_count) }} · {{ format_taka((float) $cart->subtotal) }} · {{ $cart->last_activity_at?->format('d M Y') }}</span>
+                            <span class="text-[10px] font-bold text-slate-500">{{ $cart->displayStatus() }}</span>
+                        </a>
+                    @empty
+                        <p class="text-[12px] text-slate-400">No saved or abandoned carts.</p>
+                    @endforelse
+                </div>
             @endcan
 
             <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -109,9 +124,10 @@
                     <li><b class="text-slate-700">New</b> — first order (or sign-up) in the last {{ $rules['new_days'] }} days</li>
                     <li><b class="text-slate-700">Returning</b> — 2 or more orders</li>
                     <li><b class="text-slate-700">Frequent buyer</b> — {{ $rules['frequent_orders'] }}+ orders</li>
-                    <li><b class="text-slate-700">High value</b> — spent Tk {{ format_taka_number($rules['high_value_spend']) }}+</li>
-                    <li><b class="text-slate-700">VIP</b> — spent Tk {{ format_taka_number($rules['vip_spend']) }}+</li>
+                    <li><b class="text-slate-700">High value</b> — spent {{ format_taka($rules['high_value_spend']) }}+</li>
+                    <li><b class="text-slate-700">VIP</b> — spent {{ format_taka($rules['vip_spend']) }}+</li>
                     <li><b class="text-slate-700">Inactive</b> — no order for {{ $rules['inactive_days'] }} days</li>
+                    <li><b class="text-slate-700">COD risk</b> — {{ $rules['cod_risk_returns'] ?? 2 }}+ returned / refused orders</li>
                 </ul>
             </div>
         </div>

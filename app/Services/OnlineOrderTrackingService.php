@@ -34,9 +34,11 @@ class OnlineOrderTrackingService
         ?string $courier = null,
         ?string $tracking = null,
         ?int $userId = null,
+        ?string $fromStatus = null,
     ): OrderStatusLog {
         return OrderStatusLog::create([
             'order_id' => $order->id,
+            'from_status' => $fromStatus,
             'status' => $status,
             'label' => OrderStatus::customerLabel($status),
             'note' => $note,

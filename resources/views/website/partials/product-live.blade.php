@@ -115,13 +115,13 @@
 
         <h1 class="pd-title">{{ $displayName }}</h1>
 
-        @if($product->rating > 0 || $reviews->isNotEmpty())
+        @if($product->review_count > 0)
             <div class="flex flex-wrap items-center gap-2 mb-2 text-xs text-slate-500">
-                @php $stars = $product->rating > 0 ? round($product->rating) : (int) round($reviews->avg('rating')); @endphp
+                @php $stars = round((float) $product->rating); @endphp
                 <span class="flex text-amber-400">
                     @for($i=1;$i<=5;$i++)<span class="{{ $i<=$stars?'':'text-slate-200' }}">★</span>@endfor
                 </span>
-                <span>({{ $product->review_count ?: $reviews->count() }} Reviews)</span>
+                <span>({{ $product->review_count }} {{ \Illuminate\Support\Str::plural('Review', $product->review_count) }})</span>
             </div>
         @endif
 
@@ -287,13 +287,12 @@
 
         @include('website.partials.product-share')
 
+        @php
+            $trustItems = collect($features ?? [])->map(fn ($f) => [$f->title, (string) $f->subtitle]);
+        @endphp
+        @if($trustItems->isNotEmpty())
         <div class="pd-trust">
-            @foreach([
-                ['Fast Delivery', 'COD available'],
-                ['Easy Returns', 'Hassle-free'],
-                ['Genuine Products', '100% authentic'],
-                ['Secure Checkout', 'Guest or sign in'],
-            ] as [$title, $sub])
+            @foreach($trustItems->take(4) as [$title, $sub])
                 <div class="pd-trust-item">
                     <svg class="w-3.5 h-3.5 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                     <div class="min-w-0">
@@ -303,6 +302,7 @@
                 </div>
             @endforeach
         </div>
+        @endif
     </div>
 </div>
 
