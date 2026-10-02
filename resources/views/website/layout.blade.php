@@ -215,6 +215,8 @@
                 orderMessage: '',
                 lastOrderId: null,
                 lastOrderInvoice: '',
+                lastOrderGuest: false,
+                lastTrackUrl: '',
                 redirectSeconds: 0,
                 _redirectTimer: null,
                 orderSuccess: false,
@@ -280,6 +282,7 @@
                 get wishlistCount() { return this.wishlist.length; },
                 init() {
                     this.syncCart({ silent: true });
+                    if (!this.isLoggedIn) this.restoreGuestContact();
                     try {
                         const params = new URLSearchParams(window.location.search);
                         if (params.get('signin') === '1' || params.get('signin') === 'true') {
@@ -482,6 +485,43 @@
                     this.checkout.phone = profile?.phone || '';
                     this.checkout.address = profile?.address || '';
                 },
+                // Guests: remember contact details and recent order IDs on this device only.
+                restoreGuestContact() {
+                    try {
+                        const saved = JSON.parse(localStorage.getItem('gaget_guest_contact') || 'null');
+                        if (!saved) return;
+                        this.checkout.name = this.checkout.name || saved.name || '';
+                        this.checkout.phone = this.checkout.phone || saved.phone || '';
+                        this.checkout.address = this.checkout.address || saved.address || '';
+                        if (saved.zone) this.checkout.zone = saved.zone;
+                    } catch (e) {}
+                },
+                rememberGuestOrder(invoice) {
+                    try {
+                        localStorage.setItem('gaget_guest_contact', JSON.stringify({
+                            name: this.checkout.name,
+                            phone: this.checkout.phone,
+                            address: this.checkout.address,
+                            zone: this.checkout.zone,
+                        }));
+                        if (!invoice) return;
+                        const recent = JSON.parse(localStorage.getItem('gaget_recent_orders') || '[]')
+                            .filter((o) => o && o.invoice && o.invoice !== invoice);
+                        recent.unshift({ invoice, phone: this.checkout.phone, at: new Date().toISOString() });
+                        localStorage.setItem('gaget_recent_orders', JSON.stringify(recent.slice(0, 5)));
+                    } catch (e) {}
+                },
+                signInForCheckout() {
+                    this.authPurpose = 'checkout';
+                    this.checkoutStep = 'auth';
+                    this.authTab = 'login';
+                    this.authMessage = '';
+                    this.authMessageOk = false;
+                },
+                continueAsGuest() {
+                    this.authMessage = '';
+                    this.checkoutStep = 'order';
+                },
                 startCheckout() {
                     if (this.cart.length === 0) return;
                     this.cartOpen = false;
@@ -498,12 +538,7 @@
                         this.checkout.payment_method = 'cash_on_delivery';
                     }
                     this.syncCart({ silent: true });
-                    if (this.isLoggedIn) {
-                        this.checkoutStep = 'order';
-                    } else {
-                        this.checkoutStep = 'auth';
-                        this.authTab = 'login';
-                    }
+                    this.checkoutStep = 'order';
                 },
                 openSignIn(tab = 'login') {
                     this.cartOpen = false;
@@ -621,12 +656,6 @@
                         this.orderSuccess = false;
                         return;
                     }
-                    if (!this.isLoggedIn) {
-                        this.syncCart({ silent: true });
-                        this.checkoutStep = 'auth';
-                        this.authTab = 'login';
-                        return;
-                    }
                     this.ordering = true;
                     this.orderMessage = '';
                     if (window.GagetLoader) window.GagetLoader.show('Placing your order');
@@ -653,11 +682,9 @@
                             this.orderMessage = 'Session expired. Please try placing the order again.';
                             return;
                         }
-                        if (res.status === 401 || data.auth_required) {
-                            this.isLoggedIn = false;
-                            this.checkoutStep = 'auth';
-                            this.authTab = 'login';
-                            this.authMessage = 'Please sign in to place your order.';
+                        if (res.status === 429) {
+                            this.orderSuccess = false;
+                            this.orderMessage = 'Too many attempts. Please wait a minute and try again.';
                             return;
                         }
                         if (res.status === 422) {
@@ -681,9 +708,15 @@
                             this.orderSuccess = true;
                             this.lastOrderId = data.order_id || null;
                             this.lastOrderInvoice = data.invoice || '';
+                            this.lastOrderGuest = !!data.guest;
+                            this.lastTrackUrl = data.track_url || '';
                             this.orderMessage = '';
                             this.checkoutStep = 'success';
-                            this.startAccountRedirect();
+                            if (this.lastOrderGuest) {
+                                this.rememberGuestOrder(this.lastOrderInvoice);
+                            } else {
+                                this.startAccountRedirect();
+                            }
                         } else {
                             this.orderSuccess = false;
                             this.orderMessage = data.message || 'Order failed.';
@@ -691,9 +724,19 @@
                     } catch (e) {
                         this.orderSuccess = false;
                         this.orderMessage = 'Network error.';
+                    } finally {
+                        this.ordering = false;
+                        if (window.GagetLoader) window.GagetLoader.hide();
                     }
-                    this.ordering = false;
-                    if (window.GagetLoader) window.GagetLoader.hide();
+                },
+                trackLastOrder() {
+                    if (window.GagetLoader) window.GagetLoader.show('Opening order tracking');
+                    window.location.href = this.lastTrackUrl
+                        || (@json(route('website.track')) + '?invoice=' + encodeURIComponent(this.lastOrderInvoice || ''));
+                },
+                finishGuestOrder() {
+                    this.checkoutOpen = false;
+                    this.checkoutStep = 'order';
                 },
                 startAccountRedirect() {
                     if (this._redirectTimer) clearInterval(this._redirectTimer);
@@ -750,6 +793,18 @@
             return {
                 open: false,
                 _timer: null,
+                hl: { y: 0, h: 0, on: false, snap: true },
+                track(event) {
+                    const item = event.target.closest('.gaget-nav-dropdown-item');
+                    if (!item) return;
+                    const snap = !this.hl.on;
+                    this.hl = { y: item.offsetTop, h: item.offsetHeight, on: true, snap };
+                    if (snap) requestAnimationFrame(() => { this.hl.snap = false; });
+                },
+                untrack() {
+                    this.hl.on = false;
+                    this.hl.snap = true;
+                },
                 show() {
                     clearTimeout(this._timer);
                     this.open = true;
@@ -978,8 +1033,8 @@
 
         {{-- Auth step (standalone account OR checkout) --}}
         <div x-show="checkoutStep==='auth'" x-cloak>
-            <h3 class="text-xl font-bold text-slate-900 pr-8" x-text="authPurpose === 'checkout' ? 'Sign in to checkout' : (authTab === 'register' ? 'Create your account' : 'Welcome back')"></h3>
-            <p class="text-sm text-slate-500 mt-1 mb-5" x-text="authPurpose === 'checkout' ? 'Create an account if needed, then sign in to place your order.' : 'Create an account anytime — then sign in to shop and track orders.'"></p>
+            <h3 class="text-xl font-bold text-slate-900 pr-8" x-text="authPurpose === 'checkout' ? 'Sign in for faster checkout' : (authTab === 'register' ? 'Create your account' : 'Welcome back')"></h3>
+            <p class="text-sm text-slate-500 mt-1 mb-5" x-text="authPurpose === 'checkout' ? 'Use your saved details and see every order in My Orders — or continue as a guest.' : 'Create an account anytime — then sign in to shop and track orders.'"></p>
 
             <div class="flex rounded-xl bg-slate-100 p-1 mb-5">
                 <button type="button" @click="authTab='login'; authMessage=''; authMessageOk=false" class="flex-1 rounded-lg py-2 text-sm font-semibold transition" :class="authTab==='login' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'">Sign in</button>
@@ -1006,12 +1061,36 @@
             </div>
 
             <p x-show="authMessage" x-text="authMessage" class="mt-3 text-sm text-center" :class="authMessageOk ? 'text-emerald-600' : 'text-rose-600'"></p>
+
+            <template x-if="authPurpose === 'checkout'">
+                <div class="mt-5">
+                    <div class="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                        <span class="h-px flex-1 bg-slate-200"></span>or<span class="h-px flex-1 bg-slate-200"></span>
+                    </div>
+                    <button type="button" @click="continueAsGuest()" class="bb-guest-btn mt-4">
+                        Continue as guest
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M5 12h14m-6-6 6 6-6 6"/></svg>
+                    </button>
+                    <p class="mt-2 text-center text-[11.5px] text-slate-500">No account needed — track your order with its Order ID and phone number.</p>
+                </div>
+            </template>
         </div>
 
         {{-- Order step --}}
         <div x-show="checkoutStep==='order'" x-cloak>
             <h3 class="text-xl font-bold text-slate-900 pr-8">Place order</h3>
             <p class="text-sm text-slate-500 mt-1 mb-4"><span x-text="cartCount"></span> item(s) · Subtotal <span class="font-semibold text-slate-800" x-text="currency + Math.round(Number(cartTotal) || 0).toLocaleString()"></span></p>
+
+            <div x-show="!isLoggedIn" class="bb-guest-note mb-4">
+                <span class="bb-guest-note__icon" aria-hidden="true">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                </span>
+                <span class="min-w-0 flex-1">
+                    <span class="block text-[12.5px] font-bold text-slate-800">Checking out as a guest</span>
+                    <span class="block text-[11.5px] text-slate-500">No account needed. Have one? Sign in to use your saved details.</span>
+                </span>
+                <button type="button" @click="signInForCheckout()" class="bb-guest-note__link">Sign in</button>
+            </div>
 
             <div class="space-y-3">
                 <div>
@@ -1119,17 +1198,40 @@
             <div class="mt-5 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-4 py-4 shadow-sm">
                 <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-700">Your Order ID</p>
                 <p class="mt-1.5 font-mono text-[17px] font-extrabold tracking-wide text-emerald-950" x-text="lastOrderInvoice || ('#' + lastOrderId)"></p>
-                <p class="mt-2 text-[12px] text-emerald-800/80">Keep this ID for tracking and support.</p>
+                <p class="mt-2 text-[12px] text-emerald-800/80" x-show="!lastOrderGuest">Keep this ID for tracking and support.</p>
+                <p class="mt-2 text-[12px] text-emerald-800/80" x-show="lastOrderGuest" x-cloak>
+                    Track anytime with this ID and your phone <span class="font-semibold" x-text="checkout.phone"></span>.
+                </p>
             </div>
-            <p class="mt-4 text-[12px] text-slate-500">
-                Taking you to <span class="font-semibold text-slate-700">My Orders</span>
-                <span x-show="redirectSeconds > 0"> in <span class="font-bold text-blue-600" x-text="redirectSeconds"></span>s…</span>
-            </p>
-            <div class="mt-5 flex flex-col gap-2">
-                <button type="button" @click="goToAccountNow()" class="gaget-btn-primary w-full text-center text-sm py-3">
-                    View my order now
-                </button>
-            </div>
+
+            <template x-if="!lastOrderGuest">
+                <div>
+                    <p class="mt-4 text-[12px] text-slate-500">
+                        Taking you to <span class="font-semibold text-slate-700">My Orders</span>
+                        <span x-show="redirectSeconds > 0"> in <span class="font-bold text-blue-600" x-text="redirectSeconds"></span>s…</span>
+                    </p>
+                    <div class="mt-5 flex flex-col gap-2">
+                        <button type="button" @click="goToAccountNow()" class="gaget-btn-primary w-full text-center text-sm py-3">
+                            View my order now
+                        </button>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="lastOrderGuest">
+                <div class="mt-5 flex flex-col gap-2">
+                    <button type="button" @click="trackLastOrder()" class="gaget-btn-primary w-full text-center text-sm py-3">
+                        Track my order
+                    </button>
+                    <button type="button" @click="finishGuestOrder()" class="bb-guest-btn">
+                        Continue shopping
+                    </button>
+                    <p class="mt-1 text-[11.5px] text-slate-500">
+                        Want every order in one place?
+                        <button type="button" @click="openSignIn('register')" class="font-bold text-[color:var(--bb-coral-deep)] hover:underline">Create an account</button>
+                    </p>
+                </div>
+            </template>
         </div>
     </div>
 </div>

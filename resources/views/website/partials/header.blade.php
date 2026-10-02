@@ -13,26 +13,6 @@
 @endphp
 
 <div class="gaget-sticky-header" x-data="{ searchOpen: false }">
-    @php
-        $topOffer = trim((string) ($settings->special_offer_text ?? ''));
-        $topLinks = $topBarNav ?? collect();
-    @endphp
-    @if($topOffer !== '' || $topLinks->isNotEmpty())
-        <div class="bb-topbar">
-            <div class="bb-topbar-inner">
-                @if($topOffer !== '')
-                    <p class="bb-topbar-offer">@include('website.partials.bb-icon', ['name' => 'sparkle']) {{ $topOffer }}</p>
-                @endif
-                @if($topLinks->isNotEmpty())
-                    <nav class="bb-topbar-links" aria-label="Top links">
-                        @foreach($topLinks as $link)
-                            <a href="{{ $link->url }}">{{ $link->label }}</a>
-                        @endforeach
-                    </nav>
-                @endif
-            </div>
-        </div>
-    @endif
     <div class="gaget-floatbar-shell">
         <div class="gaget-floatbar">
             {{-- Brand --}}
@@ -90,18 +70,9 @@
                                     {{ $link->label }}
                                     <svg class="gaget-nav-chevron" :class="{ 'is-open': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                 </button>
-                                <div class="gaget-nav-dropdown-menu" x-show="open" x-cloak x-transition.opacity.duration.100ms style="display: none;">
-                                    <a href="{{ $link->url ?: route('website.shop') }}" class="gaget-nav-dropdown-item gaget-nav-dropdown-item--all">
-                                        <span>All categories</span>
-                                    </a>
-                                    @forelse($allCategories ?? [] as $cat)
-                                        <a href="{{ route('website.category', $cat->slug) }}" class="gaget-nav-dropdown-item">
-                                            <span>{{ $cat->name }}</span>
-                                            <span class="gaget-nav-dropdown-count">{{ $cat->products_count ?? 0 }}</span>
-                                        </a>
-                                    @empty
-                                        <span class="gaget-nav-dropdown-empty">No categories yet</span>
-                                    @endforelse
+                                <div class="gaget-nav-dropdown-menu" @mouseover="track($event)" @focusin="track($event)" @mouseleave="untrack()">
+                                    <span class="gaget-nav-dropdown-glow" aria-hidden="true" :class="{ 'is-on': hl.on, 'is-snap': hl.snap }" :style="`--hl-y:${hl.y}px;--hl-h:${hl.h}px`"></span>
+                                    @include('website.partials.nav-dropdown-categories', ['allUrl' => $link->url ?: route('website.shop')])
                                 </div>
                             </div>
                         @elseif(strcasecmp($navLabel, 'Brands') === 0 || strcasecmp($navLabel, 'Brand') === 0)
@@ -122,14 +93,25 @@
                                     {{ $link->label }}
                                     <svg class="gaget-nav-chevron" :class="{ 'is-open': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                 </button>
-                                <div class="gaget-nav-dropdown-menu gaget-nav-dropdown-menu--end" x-show="open" x-cloak x-transition.opacity.duration.100ms style="display: none;">
+                                <div class="gaget-nav-dropdown-menu gaget-nav-dropdown-menu--end" @mouseover="track($event)" @focusin="track($event)" @mouseleave="untrack()">
+                                    <span class="gaget-nav-dropdown-glow" aria-hidden="true" :class="{ 'is-on': hl.on, 'is-snap': hl.snap }" :style="`--hl-y:${hl.y}px;--hl-h:${hl.h}px`"></span>
                                     <a href="{{ $link->url ?: route('home').'#brands' }}" class="gaget-nav-dropdown-item gaget-nav-dropdown-item--all">
                                         <span>All brands</span>
+                                        <span class="gaget-nav-dropdown-cta">View all @include('website.partials.nav-dropdown-arrow', ['class' => ''])</span>
                                     </a>
+                                    @php $brandTints = [['#f7f3fe', '#6a4bb8'], ['#fdf3ea', '#db6f4a'], ['#eef1e4', '#6f8560'], ['#fff6dc', '#b98a14'], ['#fdeef1', '#c9506d'], ['#eaf4fb', '#3f7fae']]; @endphp
                                     @forelse($brands ?? [] as $brand)
-                                        <a href="{{ route('website.brand', \Illuminate\Support\Str::slug($brand->name)) }}" class="gaget-nav-dropdown-item">
-                                            <span>{{ $brand->name }}</span>
-                                            <span class="gaget-nav-dropdown-count">{{ $brand->products_count ?? $brand->published_count ?? 0 }}</span>
+                                        @php $tint = $brandTints[$loop->index % count($brandTints)]; @endphp
+                                        <a href="{{ route('website.brand', \Illuminate\Support\Str::slug($brand->name)) }}" class="gaget-nav-dropdown-item" style="--i: {{ min($loop->index + 1, 14) }}">
+                                            <span class="gaget-nav-dropdown-icon" style="--dd-bg: {{ $tint[0] }}; --dd-fg: {{ $tint[1] }};">
+                                                @if($brand->logo_url)
+                                                    <img src="{{ $brand->logo_url }}" alt="" loading="lazy" decoding="async">
+                                                @else
+                                                    {{ mb_strtoupper(mb_substr($brand->name, 0, 1)) }}
+                                                @endif
+                                            </span>
+                                            <span class="gaget-nav-dropdown-label">{{ $brand->name }}</span>
+                                            @include('website.partials.nav-dropdown-arrow')
                                         </a>
                                     @empty
                                         <span class="gaget-nav-dropdown-empty">No brands yet</span>
@@ -154,11 +136,9 @@
                                     Shop
                                     <svg class="gaget-nav-chevron" :class="{ 'is-open': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                 </button>
-                                <div class="gaget-nav-dropdown-menu" x-show="open" x-cloak x-transition.opacity.duration.100ms style="display: none;">
-                                    <a href="{{ route('website.shop') }}" class="gaget-nav-dropdown-item gaget-nav-dropdown-item--all"><span>All products</span></a>
-                                    <a href="{{ route('website.shop', ['filter'=>'deals']) }}" class="gaget-nav-dropdown-item"><span>Deals</span></a>
-                                    <a href="{{ route('website.shop', ['filter'=>'new']) }}" class="gaget-nav-dropdown-item"><span>New arrivals</span></a>
-                                    <a href="{{ route('website.shop', ['filter'=>'bestsellers']) }}" class="gaget-nav-dropdown-item"><span>Best sellers</span></a>
+                                <div class="gaget-nav-dropdown-menu" @mouseover="track($event)" @focusin="track($event)" @mouseleave="untrack()">
+                                    <span class="gaget-nav-dropdown-glow" aria-hidden="true" :class="{ 'is-on': hl.on, 'is-snap': hl.snap }" :style="`--hl-y:${hl.y}px;--hl-h:${hl.h}px`"></span>
+                                    @include('website.partials.nav-dropdown-shop')
                                 </div>
                             </div>
                         @else
@@ -188,11 +168,9 @@
                                 Shop
                                 <svg class="gaget-nav-chevron" :class="{ 'is-open': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                             </button>
-                            <div class="gaget-nav-dropdown-menu" x-show="open" x-cloak x-transition.opacity.duration.100ms style="display: none;">
-                                <a href="{{ route('website.shop') }}" class="gaget-nav-dropdown-item gaget-nav-dropdown-item--all"><span>All products</span></a>
-                                <a href="{{ route('website.shop', ['filter'=>'deals']) }}" class="gaget-nav-dropdown-item"><span>Deals</span></a>
-                                <a href="{{ route('website.shop', ['filter'=>'new']) }}" class="gaget-nav-dropdown-item"><span>New arrivals</span></a>
-                                <a href="{{ route('website.shop', ['filter'=>'bestsellers']) }}" class="gaget-nav-dropdown-item"><span>Best sellers</span></a>
+                            <div class="gaget-nav-dropdown-menu" @mouseover="track($event)" @focusin="track($event)" @mouseleave="untrack()">
+                                <span class="gaget-nav-dropdown-glow" aria-hidden="true" :class="{ 'is-on': hl.on, 'is-snap': hl.snap }" :style="`--hl-y:${hl.y}px;--hl-h:${hl.h}px`"></span>
+                                @include('website.partials.nav-dropdown-shop')
                             </div>
                         </div>
 
@@ -213,16 +191,9 @@
                                 Categories
                                 <svg class="gaget-nav-chevron" :class="{ 'is-open': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                             </button>
-                            <div class="gaget-nav-dropdown-menu" x-show="open" x-cloak x-transition.opacity.duration.100ms style="display: none;">
-                                <a href="{{ route('website.shop') }}" class="gaget-nav-dropdown-item gaget-nav-dropdown-item--all"><span>All categories</span></a>
-                                @forelse($allCategories ?? [] as $cat)
-                                    <a href="{{ route('website.category', $cat->slug) }}" class="gaget-nav-dropdown-item">
-                                        <span>{{ $cat->name }}</span>
-                                        <span class="gaget-nav-dropdown-count">{{ $cat->products_count ?? 0 }}</span>
-                                    </a>
-                                @empty
-                                    <span class="gaget-nav-dropdown-empty">No categories yet</span>
-                                @endforelse
+                            <div class="gaget-nav-dropdown-menu" @mouseover="track($event)" @focusin="track($event)" @mouseleave="untrack()">
+                                <span class="gaget-nav-dropdown-glow" aria-hidden="true" :class="{ 'is-on': hl.on, 'is-snap': hl.snap }" :style="`--hl-y:${hl.y}px;--hl-h:${hl.h}px`"></span>
+                                @include('website.partials.nav-dropdown-categories', ['allUrl' => route('website.shop')])
                             </div>
                         </div>
 
@@ -303,6 +274,13 @@
                         aria-label="Search">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 </button>
+                <a href="{{ route('website.track') }}"
+                   class="gaget-track-pill {{ request()->routeIs('website.track') ? 'is-active' : '' }}"
+                   title="Track my order"
+                   aria-label="Track my order">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    <span class="gaget-track-pill__label">Track order</span>
+                </a>
                 <div class="gaget-action-wrap" x-data="{ open: false }" @mouseenter="open=true" @mouseleave="open=false">
                     <a href="{{ route('website.wishlist') }}" class="gaget-action-btn" aria-label="Wishlist">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
@@ -343,6 +321,8 @@
                         <svg class="gaget-cart-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                         <span class="gaget-action-label">Cart</span>
                         <span class="gaget-cart-badge"
+                              x-show="cartCount > 0"
+                              x-cloak
                               x-text="cartCount"
                               x-transition:enter="transition ease-out duration-200"
                               x-transition:enter-start="opacity-0 scale-50"
@@ -560,9 +540,6 @@
                                 @foreach(($allCategories ?? []) as $cat)
                                     <a href="{{ route('website.category', $cat->slug) }}" class="gaget-mobile-drawer-link gaget-mobile-drawer-link--sub" @click="mobileOpen = false">
                                         <span>{{ $cat->name }}</span>
-                                        @if(($cat->products_count ?? 0) > 0)
-                                            <span class="gaget-mobile-drawer-count">{{ $cat->products_count }}</span>
-                                        @endif
                                     </a>
                                 @endforeach
                             </div>
@@ -586,9 +563,6 @@
                                 @foreach(($brands ?? []) as $brand)
                                     <a href="{{ route('website.brand', \Illuminate\Support\Str::slug($brand->name)) }}" class="gaget-mobile-drawer-link gaget-mobile-drawer-link--sub" @click="mobileOpen = false">
                                         <span>{{ $brand->name }}</span>
-                                        @if(($brand->products_count ?? $brand->published_count ?? 0) > 0)
-                                            <span class="gaget-mobile-drawer-count">{{ $brand->products_count ?? $brand->published_count }}</span>
-                                        @endif
                                     </a>
                                 @endforeach
                             </div>
@@ -618,9 +592,6 @@
                         @foreach(($allCategories ?? []) as $cat)
                             <a href="{{ route('website.category', $cat->slug) }}" class="gaget-mobile-drawer-link gaget-mobile-drawer-link--sub" @click="mobileOpen = false">
                                 <span>{{ $cat->name }}</span>
-                                @if(($cat->products_count ?? 0) > 0)
-                                    <span class="gaget-mobile-drawer-count">{{ $cat->products_count }}</span>
-                                @endif
                             </a>
                         @endforeach
                     </div>
@@ -646,7 +617,8 @@
                     @endif
                 @else
                     <button type="button" class="gaget-mobile-drawer-cta" @click="mobileOpen = false; openSignIn('login')">Sign in</button>
-                    <p class="gaget-mobile-drawer-note">Track orders and save your wishlist.</p>
+                    <a href="{{ route('website.track') }}" class="gaget-mobile-drawer-link">Track an order</a>
+                    <p class="gaget-mobile-drawer-note">No account needed to order — track with your Order ID and phone.</p>
                 @endauth
             </div>
         </div>

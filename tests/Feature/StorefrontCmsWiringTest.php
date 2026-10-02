@@ -49,9 +49,10 @@ class StorefrontCmsWiringTest extends TestCase
         SiteFeature::create(['shop_id' => $this->admin->shop_id, 'icon' => 'return', 'title' => '7-Day Returns', 'subtitle' => 'Unused items', 'is_active' => true]);
         $this->product->update(['is_featured' => true]);
 
+        // The announcement strip was removed from the storefront, even when offer text / top-bar links exist.
         $this->get('/')->assertOk()
-            ->assertSee('Free delivery this weekend')
-            ->assertSee('Size Guide')
+            ->assertDontSee('bb-topbar', false)
+            ->assertDontSee('Free delivery this weekend')
             ->assertSee('Welcome to Nest Store')
             ->assertSee('Baby Boutique')
             ->assertSee('Staff Picks')

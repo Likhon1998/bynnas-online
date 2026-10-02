@@ -120,7 +120,6 @@
                         <li><a href="{{ $returnsUrl }}">Returns &amp; Exchanges</a></li>
                     @endif
                     <li><a href="{{ route('website.faqs') }}">FAQ</a></li>
-                    <li><a href="{{ route('website.track') }}">Track Your Order</a></li>
                     <li><a href="{{ route('website.contact') }}">Contact Us</a></li>
                 </ul>
             </div>

@@ -1,14 +1,16 @@
 <div class="space-y-4">
     @php
+        $showChannels = retail_enabled() || $orderSummary['web'] !== $orderSummary['total'];
         $orderCards = array_values(array_filter([
             ['Total', $orderSummary['total'], 'text-indigo-600'],
             retail_enabled() ? ['POS', $orderSummary['pos'], 'text-sky-600'] : null,
-            ['Online', $orderSummary['web'], 'text-emerald-600'],
+            $showChannels ? ['Online', $orderSummary['web'], 'text-emerald-600'] : null,
             ['Pending', $orderSummary['pending'], 'text-amber-600'],
             ['Completed', $orderSummary['completed'], 'text-violet-600'],
         ]));
+        $orderGrid = [3 => 'grid-cols-3', 4 => 'grid-cols-2 lg:grid-cols-4', 5 => 'grid-cols-2 lg:grid-cols-5'][count($orderCards)];
     @endphp
-    <div class="grid grid-cols-2 {{ count($orderCards) === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4' }} gap-4">
+    <div class="grid {{ $orderGrid }} gap-4">
         @foreach($orderCards as [$label, $value, $tone])
             <div class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
                 <p class="text-[10px] font-bold text-gray-400 uppercase">{{ $label }}</p>

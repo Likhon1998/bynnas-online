@@ -632,52 +632,179 @@ class WebsiteController extends Controller
         return back()->with('contact_success', 'Thanks! Your message has been sent. We\'ll get back to you soon.');
     }
 
-    public function trackOrder()
+    public function trackOrder(Request $request)
     {
+        $invoice = trim((string) $request->query('invoice', ''));
+        $tracking = null;
+        $masked = false;
+
+        if ($invoice !== '' && ($shopId = $this->website->shopId())) {
+            $order = $this->findOnlineOrder($shopId, $invoice);
+            $access = $order ? $this->trackingAccess($request, $order) : null;
+
+            if ($access) {
+                $tracking = $this->tracking->trackingPayload($order);
+                $masked = $access === self::TRACK_MASKED;
+                if ($masked) {
+                    $tracking['customer_name'] = $this->maskName($tracking['customer_name'] ?? '');
+                    $tracking['delivery_address'] = $this->maskAddress($tracking['delivery_address'] ?? '');
+                }
+            }
+        }
+
         return view('website.track-order', array_merge($this->website->homepageData(), [
-            'tracking' => null,
-            'invoiceNo' => request('invoice'),
-            'phone' => request('phone'),
+            'tracking' => $tracking,
+            'trackingMasked' => $masked,
+            'invoiceNo' => $invoice,
+            'phone' => $request->query('phone'),
+            'phoneOrders' => session('phone_orders'),
         ]));
     }
 
     public function trackOrderLookup(Request $request)
     {
         $data = $request->validate([
-            'invoice_no' => ['required', 'string', 'max:64'],
+            'lookup_mode' => ['nullable', 'in:id,phone'],
+            'invoice_no' => ['nullable', 'required_if:lookup_mode,id', 'string', 'max:64'],
             'phone' => ['required', 'string', 'max:32'],
+        ], [
+            'invoice_no.required_if' => 'Enter your Order ID, or switch to “Phone number only”.',
         ]);
 
         $shopId = $this->website->shopId();
         abort_unless($shopId, 404);
 
-        $invoice = trim($data['invoice_no']);
         $phone = Customer::normalizePhone($data['phone']);
+        if (strlen($phone) < 8) {
+            return back()->withInput()->with('error', 'Enter the full phone number used at checkout.');
+        }
 
-        $order = Order::where('shop_id', $shopId)
-            ->onlineOrders()
-            ->where('invoice_no', $invoice)
-            ->with(['customer', 'items.product', 'statusLogs'])
-            ->first();
+        $invoice = strtoupper(trim((string) ($data['invoice_no'] ?? '')));
 
-        $phoneMatches = $order && in_array($phone, array_filter([
-            Customer::normalizePhone($order->customer?->phone),
-            $order->delivery_phone ? Customer::normalizePhone($order->delivery_phone) : null,
-        ]), true);
+        // Forgot the Order ID: list every online order placed with this phone number.
+        if ($invoice === '') {
+            $orders = $this->ordersForPhone($shopId, $phone);
+            if ($orders->isEmpty()) {
+                return back()->withInput()->with('error', 'No orders found for that phone number.');
+            }
 
-        if (! $order || ! $phoneMatches) {
+            $orders->each(fn (Order $order) => $this->rememberTrackedOrder($request, $order->invoice_no, self::TRACK_MASKED));
+
+            return redirect()->route('website.track')
+                ->withInput(['lookup_mode' => 'phone', 'phone' => $data['phone']])
+                ->with('phone_orders', $orders->map(fn (Order $order) => $this->phoneOrderSummary($order))->all());
+        }
+
+        $order = $this->findOnlineOrder($shopId, $invoice);
+        if (! $order || ! $this->orderMatchesPhone($order, $phone)) {
             return back()
                 ->withInput()
                 ->with('error', 'No order found for that Order ID and phone number.');
         }
 
-        $payload = $this->tracking->trackingPayload($order);
+        $this->rememberTrackedOrder($request, $order->invoice_no, self::TRACK_MASKED);
 
-        return view('website.track-order', array_merge($this->website->homepageData(), [
-            'tracking' => $payload,
-            'invoiceNo' => $invoice,
-            'phone' => $data['phone'],
-        ]));
+        return redirect()->route('website.track', ['invoice' => $order->invoice_no]);
+    }
+
+    /** Full: placed in this browser session or owned by the signed-in customer. Masked: verified by phone only. */
+    private const TRACK_FULL = 'full';
+
+    private const TRACK_MASKED = 'masked';
+
+    private function trackingAccess(Request $request, Order $order): ?string
+    {
+        $user = $request->user();
+        if ($user?->isStorefrontCustomer() && $order->customer && (int) $order->customer->user_id === (int) $user->id) {
+            return self::TRACK_FULL;
+        }
+
+        return ((array) $request->session()->get('storefront.tracked_orders', []))[$order->invoice_no] ?? null;
+    }
+
+    private function findOnlineOrder(int $shopId, string $invoice): ?Order
+    {
+        return Order::where('shop_id', $shopId)
+            ->onlineOrders()
+            ->where('invoice_no', $invoice)
+            ->with(['customer', 'items.product', 'statusLogs'])
+            ->first();
+    }
+
+    private function ordersForPhone(int $shopId, string $phone)
+    {
+        $tail = '%'.substr($phone, -6);
+
+        return Order::where('shop_id', $shopId)
+            ->onlineOrders()
+            ->where(fn ($q) => $q->where('delivery_phone', 'like', $tail)
+                ->orWhereHas('customer', fn ($c) => $c->where('phone', 'like', $tail)))
+            ->with(['customer', 'items.product'])
+            ->latest('id')
+            ->limit(60)
+            ->get()
+            ->filter(fn (Order $order) => $this->orderMatchesPhone($order, $phone))
+            ->take(20)
+            ->values();
+    }
+
+    private function orderMatchesPhone(Order $order, string $normalizedPhone): bool
+    {
+        return in_array($normalizedPhone, array_filter([
+            Customer::normalizePhone($order->customer?->phone),
+            $order->delivery_phone ? Customer::normalizePhone($order->delivery_phone) : null,
+        ]), true);
+    }
+
+    private function phoneOrderSummary(Order $order): array
+    {
+        $names = $order->items->map(fn ($item) => $item->product?->name ?? 'Product')->values();
+        $status = \App\Support\OrderStatus::normalize($order->status);
+
+        return [
+            'invoice' => $order->invoice_no,
+            'date' => asian_datetime($order->created_at, 'd M Y'),
+            'status_label' => \App\Support\OrderStatus::customerLabel($order->status),
+            'tone' => match (true) {
+                \App\Support\OrderStatus::isVoid($status) => 'is-void',
+                in_array($status, [\App\Support\OrderStatus::DELIVERED, \App\Support\OrderStatus::COMPLETED], true) => 'is-done',
+                default => 'is-live',
+            },
+            'items' => $names->first().($names->count() > 1 ? ' + '.($names->count() - 1).' more' : ''),
+            'total' => number_format((float) $order->total_amount, 2),
+            'url' => route('website.track', ['invoice' => $order->invoice_no]),
+        ];
+    }
+
+    private function rememberTrackedOrder(Request $request, string $invoice, string $level = self::TRACK_FULL): void
+    {
+        $tracked = (array) $request->session()->get('storefront.tracked_orders', []);
+        if (($tracked[$invoice] ?? null) === self::TRACK_FULL) {
+            $level = self::TRACK_FULL;
+        }
+        unset($tracked[$invoice]);
+        $tracked[$invoice] = $level;
+        $request->session()->put('storefront.tracked_orders', array_slice($tracked, -40, null, true));
+    }
+
+    private function maskName(string $name): string
+    {
+        return collect(preg_split('/\s+/u', trim($name)) ?: [])
+            ->filter()
+            ->map(fn ($part) => mb_substr($part, 0, 1).str_repeat('•', max(2, min(6, mb_strlen($part) - 1))))
+            ->implode(' ') ?: '—';
+    }
+
+    private function maskAddress(string $address): string
+    {
+        $parts = array_values(array_filter(array_map('trim', explode(',', $address))));
+        if ($parts === []) {
+            return '—';
+        }
+
+        return count($parts) > 1
+            ? '•••••, '.end($parts)
+            : mb_substr($parts[0], 0, 3).'•••••';
     }
 
     public function wishlist()
@@ -765,9 +892,7 @@ class WebsiteController extends Controller
     public function checkout(Request $request)
     {
         $user = $request->user();
-        if (! $user?->isStorefrontCustomer()) {
-            return response()->json(['success' => false, 'message' => 'Please sign in to place an order.', 'auth_required' => true], 401);
-        }
+        $customerUser = $user?->isStorefrontCustomer() ? $user : null;
 
         $shopId = $this->website->shopId();
         if (! $shopId || empty($request->cart)) {
@@ -791,7 +916,7 @@ class WebsiteController extends Controller
                 'name' => $request->customer_name,
                 'phone' => $request->customer_phone,
                 'address' => $request->customer_address,
-            ], (array) $request->cart, $user, [
+            ], (array) $request->cart, $customerUser, [
                 'zone' => $request->input('delivery_zone'),
                 'payment_method' => $request->input('payment_method'),
                 'payment_reference' => $request->input('payment_reference'),
@@ -806,11 +931,14 @@ class WebsiteController extends Controller
 
         $order = $result['order'];
         $quote = $result['quote'];
+        $this->rememberTrackedOrder($request, $order->invoice_no);
 
         return response()->json([
             'success' => true,
+            'guest' => $customerUser === null,
             'order_id' => $order->id,
             'invoice' => $order->invoice_no,
+            'track_url' => route('website.track', ['invoice' => $order->invoice_no]),
             'delivery_fee' => $quote['delivery_fee'],
             'grand_total' => $quote['grand_total'],
             'payment_method' => $quote['payment_method'],

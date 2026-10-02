@@ -25,58 +25,30 @@
     $brandTotal = max(1, (float) ($brandSales ?? collect())->sum('revenue'));
 @endphp
 
-{{-- KPI cards --}}
+{{-- KPI cards (each carries its own last-period comparison) --}}
+@php
+    $kpiCards = [
+        ['revenue', 'Total Sales', true, 'bg-indigo-50 text-indigo-600', 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+        ['orders', 'Total Orders', false, 'bg-sky-50 text-sky-600', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
+        ['aov', 'Avg Order Value', true, 'bg-violet-50 text-violet-600', 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6'],
+        ['profit', 'Total Profit', true, 'bg-emerald-50 text-emerald-600', 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'],
+        ['discounts', 'Total Discounts', true, 'bg-amber-50 text-amber-600', 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z'],
+    ];
+@endphp
 <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
-    <div class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-        <div class="flex items-start justify-between gap-2">
-            <div class="h-9 w-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    @foreach($kpiCards as [$key, $label, $money, $tone, $icon])
+        <div class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+            <div class="flex items-center justify-between gap-2">
+                <span class="h-8 w-8 shrink-0 rounded-lg {{ $tone }} flex items-center justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $icon }}"/></svg>
+                </span>
+                <span class="whitespace-nowrap">{!! $changeBadge($kpis['change'][$key]) !!}</span>
             </div>
-            {!! $changeBadge($kpis['change']['revenue']) !!}
+            <p class="text-[10px] font-bold text-gray-400 uppercase mt-3">{{ $label }}</p>
+            <p class="text-xl font-black text-gray-900 mt-0.5">{{ $money ? format_taka($kpis[$key]) : number_format($kpis[$key]) }}</p>
+            <p class="text-[11px] text-gray-400 mt-0.5">Last period {{ $money ? format_taka($kpis['prev'][$key]) : number_format($kpis['prev'][$key]) }}</p>
         </div>
-        <p class="text-[10px] font-bold text-gray-400 uppercase mt-3">Total Sales</p>
-        <p class="text-xl font-black text-gray-900 mt-1">{{ format_taka($kpis['revenue']) }}</p>
-    </div>
-    <div class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-        <div class="flex items-start justify-between gap-2">
-            <div class="h-9 w-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-            </div>
-            {!! $changeBadge($kpis['change']['orders']) !!}
-        </div>
-        <p class="text-[10px] font-bold text-gray-400 uppercase mt-3">Total Orders</p>
-        <p class="text-xl font-black text-gray-900 mt-1">{{ number_format($kpis['orders']) }}</p>
-    </div>
-    <div class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-        <div class="flex items-start justify-between gap-2">
-            <div class="h-9 w-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-            </div>
-            {!! $changeBadge($kpis['change']['aov']) !!}
-        </div>
-        <p class="text-[10px] font-bold text-gray-400 uppercase mt-3">Avg Order Value</p>
-        <p class="text-xl font-black text-gray-900 mt-1">{{ format_taka($kpis['aov']) }}</p>
-    </div>
-    <div class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-        <div class="flex items-start justify-between gap-2">
-            <div class="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            </div>
-            {!! $changeBadge($kpis['change']['profit']) !!}
-        </div>
-        <p class="text-[10px] font-bold text-gray-400 uppercase mt-3">Total Profit</p>
-        <p class="text-xl font-black text-gray-900 mt-1">{{ format_taka($kpis['profit']) }}</p>
-    </div>
-    <div class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-        <div class="flex items-start justify-between gap-2">
-            <div class="h-9 w-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
-            </div>
-            {!! $changeBadge($kpis['change']['discounts']) !!}
-        </div>
-        <p class="text-[10px] font-bold text-gray-400 uppercase mt-3">Total Discounts</p>
-        <p class="text-xl font-black text-gray-900 mt-1">{{ format_taka($kpis['discounts']) }}</p>
-    </div>
+    @endforeach
 </div>
 
 {{-- Charts --}}
@@ -120,7 +92,8 @@
     </div>
 </div>
 
-{{-- Brand breakdown (POS + website) --}}
+{{-- Brand breakdown (POS + website) beside top products --}}
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
 <div class="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
     <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
         <div>
@@ -132,7 +105,7 @@
     </div>
     <div class="overflow-x-auto">
         <table class="min-w-full text-sm">
-            <thead class="bg-gray-50 text-[11px] uppercase font-bold text-gray-500">
+            <thead class="bg-gray-50 text-[11px] uppercase font-bold text-gray-500 whitespace-nowrap">
                 <tr>
                     <th class="px-5 py-3 text-left">Brand</th>
                     <th class="px-5 py-3 text-right">Units</th>
@@ -168,11 +141,10 @@
     </div>
 </div>
 
-{{-- Tables --}}
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     <div class="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
         <div class="px-5 py-4 border-b border-gray-100">
             <h3 class="font-bold text-gray-900">Top Selling Products</h3>
+            <p class="text-xs text-gray-500">Best sellers by units in this period</p>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full text-sm">
@@ -200,39 +172,6 @@
         </div>
     </div>
 
-    <div class="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-        <div class="px-5 py-4 border-b border-gray-100">
-            <h3 class="font-bold text-gray-900">Sales Summary</h3>
-        </div>
-        <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
-                <thead class="bg-gray-50 text-[11px] uppercase font-bold text-gray-500">
-                    <tr>
-                        <th class="px-5 py-3 text-left">Metric</th>
-                        <th class="px-5 py-3 text-right">This Period</th>
-                        <th class="px-5 py-3 text-right">Last Period</th>
-                        <th class="px-5 py-3 text-right">Change</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100">
-                    @foreach([
-                        ['Total Sales', $kpis['revenue'], $kpis['prev']['revenue'], $kpis['change']['revenue'], true],
-                        ['Total Orders', $kpis['orders'], $kpis['prev']['orders'], $kpis['change']['orders'], false],
-                        ['Avg Order Value', $kpis['aov'], $kpis['prev']['aov'], $kpis['change']['aov'], true],
-                        ['Total Profit', $kpis['profit'], $kpis['prev']['profit'], $kpis['change']['profit'], true],
-                        ['Total Discounts', $kpis['discounts'], $kpis['prev']['discounts'], $kpis['change']['discounts'], true],
-                    ] as [$label, $cur, $prev, $chg, $money])
-                        <tr class="hover:bg-gray-50/80">
-                            <td class="px-5 py-3 font-medium text-gray-800">{{ $label }}</td>
-                            <td class="px-5 py-3 text-right font-bold">{{ $money ? format_taka($cur) : number_format($cur) }}</td>
-                            <td class="px-5 py-3 text-right text-gray-500">{{ $money ? format_taka($prev) : number_format($prev) }}</td>
-                            <td class="px-5 py-3 text-right">{!! $changeBadge($chg) !!}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>

@@ -85,7 +85,11 @@ Route::post('/campaign/{slug}/order', [CampaignLandingPageController::class, 'or
 Route::match(['get', 'post'], '/payment/callback/{transaction}', \App\Http\Controllers\PaymentCallbackController::class)
     ->middleware('throttle:30,1')->name('payment.callback');
 Route::get('/track-order', [WebsiteController::class, 'trackOrder'])->name('website.track');
-Route::post('/track-order', [WebsiteController::class, 'trackOrderLookup'])->name('website.track.lookup');
+Route::post('/track-order', [WebsiteController::class, 'trackOrderLookup'])
+    ->middleware('throttle:20,1')->name('website.track.lookup');
+// Guests and signed-in customers share one checkout; signed-in orders attach to the account.
+Route::post('/checkout', [WebsiteController::class, 'checkout'])
+    ->middleware('throttle:10,1')->name('website.checkout');
 
 /*
 | Public CSRF refresh — storefront customers + guests need this after login / tab sleep.
@@ -107,7 +111,6 @@ Route::middleware('auth:web')->group(function () {
     Route::delete('/account/profile', [StorefrontAuthController::class, 'destroyAccount'])->name('website.account.profile.destroy');
     Route::post('/account/notifications/read-all', [StorefrontAuthController::class, 'readAllNotifications'])->name('website.account.notifications.read-all');
     Route::post('/account/notifications/{id}/read', [StorefrontAuthController::class, 'readNotification'])->name('website.account.notifications.read');
-    Route::post('/checkout', [WebsiteController::class, 'checkout'])->name('website.checkout');
 });
 Route::get('/page/{slug}', [WebsiteController::class, 'page'])->name('website.page');
 Route::get('/blog', [WebsiteController::class, 'blogs'])->name('website.blogs');

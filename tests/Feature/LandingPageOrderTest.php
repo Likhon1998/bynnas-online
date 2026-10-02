@@ -170,7 +170,7 @@ class LandingPageOrderTest extends TestCase
         $this->assertSame(2, Order::count());
 
         $this->get(route('website.landing', $page->slug))->assertOk();
-        $this->post(route('website.track.lookup'), ['invoice_no' => $order->invoice_no, 'phone' => '8801711000000'])->assertOk()->assertSee($order->invoice_no);
+        $this->followingRedirects()->post(route('website.track.lookup'), ['invoice_no' => $order->invoice_no, 'phone' => '8801711000000'])->assertOk()->assertSee($order->invoice_no);
     }
 
     public function test_guest_order_does_not_overwrite_a_registered_customer_profile(): void

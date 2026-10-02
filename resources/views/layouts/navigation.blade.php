@@ -333,14 +333,6 @@
             </a>
         @endif
 
-        @if(Auth::check())
-            <a href="{{ route('home') }}" target="_blank"
-               class="topbar-pill topbar-pill--store">
-                <span class="sm:hidden">Store</span>
-                <span class="hidden sm:inline">View Store</span>
-            </a>
-        @endif
-
         @can('manage orders')
             <div class="relative"
                  x-data="onlineOrderBell(@js(route('online-orders.notifications')), @js(route('online-orders.notifications.seen')))"

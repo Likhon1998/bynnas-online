@@ -120,7 +120,7 @@ class OrderWorkflowTest extends TestCase
 
         // Customer tracker sees the collapsed customer steps.
         $this->actingAs($this->admin, 'admin')->get(route('online-orders.show', $order))->assertOk()->assertSee('Verified');
-        $this->post(route('website.track.lookup'), ['invoice_no' => $order->invoice_no, 'phone' => '01711000000'])
+        $this->followingRedirects()->post(route('website.track.lookup'), ['invoice_no' => $order->invoice_no, 'phone' => '01711000000'])
             ->assertOk()->assertSee('Delivered');
     }
 

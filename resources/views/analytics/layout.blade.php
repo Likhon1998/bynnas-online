@@ -18,7 +18,7 @@
 
 <x-app-layout>
     <div
-        class="max-w-[1400px] mx-auto pt-0 pb-12 px-4 sm:px-6 lg:px-8 space-y-6"
+        class="max-w-[1400px] mx-auto pt-0 pb-12 px-4 sm:px-6 lg:px-8 space-y-4"
         x-data="{
             tab: @js($activeTab),
             previewOpen: false,
@@ -118,55 +118,52 @@
             }
         }"
         @keydown.escape.window="previewOpen = false"
-        @open-report-preview.window="openPreview($event.detail?.tab || tab)"
     >
-        <div class="flex flex-wrap items-start justify-between gap-4">
-            <div>
+        <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+            <div class="min-w-0">
                 <h2 class="text-2xl font-black text-gray-900 tracking-tight">Reports</h2>
-                <p class="text-sm text-gray-500 mt-1">Analyze your store performance and generate insightful reports.</p>
+                <p class="text-xs text-gray-500 mt-1">Compared with {{ $prevStart->format('d M Y') }} – {{ $prevEnd->format('d M Y') }}</p>
             </div>
-            <button
-                type="button"
-                @click="openPreview()"
-                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all"
-            >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                Export Report
-            </button>
+            <div class="flex flex-wrap items-end gap-2">
+                <form action="{{ url()->current() }}" method="GET" class="flex flex-wrap items-end gap-2">
+                    <label class="block">
+                        <span class="block text-[10px] font-bold text-gray-400 uppercase mb-1">From</span>
+                        <input type="date" name="start_date" value="{{ request('start_date', $start->format('Y-m-d')) }}" class="border-gray-200 rounded-lg text-sm px-3 py-2">
+                    </label>
+                    <label class="block">
+                        <span class="block text-[10px] font-bold text-gray-400 uppercase mb-1">To</span>
+                        <input type="date" name="end_date" value="{{ request('end_date', $end->format('Y-m-d')) }}" class="border-gray-200 rounded-lg text-sm px-3 py-2">
+                    </label>
+                    <button type="submit" class="bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-lg hover:bg-indigo-600">Apply</button>
+                    <a href="{{ route(request()->route()->getName(), ['all_time' => 1]) }}" class="bg-white border border-gray-200 text-gray-700 text-xs font-bold px-4 py-2.5 rounded-lg hover:bg-gray-50">All Time</a>
+                </form>
+                <button
+                    type="button"
+                    @click="openPreview()"
+                    class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-sm transition-all"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Export Report
+                </button>
+            </div>
         </div>
 
-        <div class="flex flex-wrap gap-2">
+        <div class="flex gap-1 overflow-x-auto rounded-xl border border-gray-100 bg-white p-1 shadow-sm">
             @foreach($tabs as $key => $tab)
                 <button
                     type="button"
                     @click="setTab(@js($key), @js(route($tab['route'], $dateParams)))"
                     :class="tab === @js($key)
-                        ? 'bg-indigo-600 text-white shadow-md border-indigo-600'
-                        : 'bg-white border border-gray-200 text-gray-600 hover:border-indigo-300 hover:text-indigo-600'"
-                    class="px-4 py-2 rounded-xl text-xs font-bold transition-all border"
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-indigo-50 hover:text-indigo-600'"
+                    class="flex-1 whitespace-nowrap px-4 py-2 rounded-lg text-xs font-bold transition-all"
                 >
                     {{ $tab['label'] }}
                 </button>
             @endforeach
         </div>
 
-        <form action="{{ url()->current() }}" method="GET" class="flex flex-wrap items-end gap-3 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
-            <div>
-                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">From</label>
-                <input type="date" name="start_date" value="{{ request('start_date', $start->format('Y-m-d')) }}" class="border-gray-200 rounded-lg text-sm px-3 py-2">
-            </div>
-            <div>
-                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">To</label>
-                <input type="date" name="end_date" value="{{ request('end_date', $end->format('Y-m-d')) }}" class="border-gray-200 rounded-lg text-sm px-3 py-2">
-            </div>
-            <button type="submit" class="bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-lg hover:bg-indigo-600">Apply</button>
-            <a href="{{ route(request()->route()->getName(), ['all_time' => 1]) }}" class="bg-gray-100 text-gray-700 text-xs font-bold px-4 py-2.5 rounded-lg hover:bg-gray-200">All Time</a>
-            <div class="ml-auto text-xs text-gray-500 self-center">
-                Comparing to {{ $prevStart->format('d M Y') }} – {{ $prevEnd->format('d M Y') }}
-            </div>
-        </form>
-
-        <div x-show="tab === 'sales'" x-cloak x-effect="if (tab === 'sales') $nextTick(() => window.renderSalesCharts && window.renderSalesCharts())">@include('analytics.partials.tabs.sales')</div>
+        <div x-show="tab === 'sales'" x-cloak class="space-y-4" x-effect="if (tab === 'sales') $nextTick(() => window.renderSalesCharts && window.renderSalesCharts())">@include('analytics.partials.tabs.sales')</div>
         <div x-show="tab === 'orders'" x-cloak>@include('analytics.partials.tabs.orders')</div>
         <div x-show="tab === 'products'" x-cloak>@include('analytics.partials.tabs.products')</div>
         <div x-show="tab === 'customers'" x-cloak>@include('analytics.partials.tabs.customers')</div>

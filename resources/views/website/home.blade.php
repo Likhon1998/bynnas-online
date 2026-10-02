@@ -484,15 +484,27 @@
         <div class="bb-blog-grid">
             @foreach($latestBlogs as $post)
                 <a href="{{ route('website.blog', $post->slug) }}" class="bb-blog-card">
-                    <span class="bb-blog-media"><img src="{{ $post->coverUrl() }}" alt="" class="bb-fill" loading="lazy" decoding="async"></span>
+                    <span class="bb-blog-media">
+                        <img src="{{ $post->coverUrl() }}" alt="{{ $post->title }}" class="bb-blog-img" loading="lazy" decoding="async">
+                        @if($post->category)
+                            <span class="bb-blog-chip">{{ $post->category->name }}</span>
+                        @endif
+                    </span>
                     <span class="bb-blog-body">
-                        <span class="bb-blog-meta">
-                            @if($post->category){{ $post->category->name }} · @endif{{ optional($post->published_at)->format('M d, Y') }}
-                        </span>
+                        @if($post->published_at)
+                            <time class="bb-blog-meta" datetime="{{ $post->published_at->toDateString() }}">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                {{ $post->published_at->format('M d, Y') }}
+                            </time>
+                        @endif
                         <span class="bb-blog-title">{{ $post->title }}</span>
                         @if($post->excerpt)
-                            <span class="bb-blog-excerpt">{{ \Illuminate\Support\Str::limit(strip_tags($post->excerpt), 110) }}</span>
+                            <span class="bb-blog-excerpt">{{ strip_tags($post->excerpt) }}</span>
                         @endif
+                        <span class="bb-blog-more">
+                            Read article
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M5 12h14m-6-6 6 6-6 6"/></svg>
+                        </span>
                     </span>
                 </a>
             @endforeach

@@ -145,7 +145,7 @@
             </div>
 
             {{-- ═══ BREAKDOWN TABLES ═══ --}}
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 {{ retail_enabled() ? 'lg:grid-cols-2' : '' }} gap-4">
 
                 {{-- Sales by Employee --}}
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
