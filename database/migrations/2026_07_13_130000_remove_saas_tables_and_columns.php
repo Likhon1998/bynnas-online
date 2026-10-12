@@ -76,7 +76,7 @@ return new class extends Migration
             ->where('CONSTRAINT_SCHEMA', $schema)
             ->where('TABLE_NAME', $table)
             ->where('CONSTRAINT_TYPE', 'FOREIGN KEY')
-            ->where(function ($q) use ($constraintOrColumn) {
+            ->where(function ($q) use ($constraintOrColumn, $table) {
                 $q->where('CONSTRAINT_NAME', $constraintOrColumn)
                     ->orWhere('CONSTRAINT_NAME', $constraintOrColumn.'_foreign')
                     ->orWhere('CONSTRAINT_NAME', $table.'_'.$constraintOrColumn.'_foreign');
