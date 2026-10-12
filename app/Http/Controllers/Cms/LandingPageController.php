@@ -27,7 +27,7 @@ class LandingPageController extends Controller
 
         $features = SiteFeature::where('shop_id', $this->shopId())->orderBy('sort_order')->orderBy('id')->get();
         $allBanners = PromoBanner::where('shop_id', $this->shopId())->orderBy('sort_order')->orderBy('id')->get();
-        $banners = $allBanners->filter(fn ($b) => ! in_array($b->placement ?? 'deals', ['hero_side', 'mid_promo'], true))->values();
+        $banners = $allBanners->filter(fn ($b) => ! in_array($b->placement ?? 'deals', ['hero_side', 'mid_promo', 'popup'], true))->values();
         $heroSide = $allBanners->filter(fn ($b) => ($b->placement ?? '') === 'hero_side')->values();
         $midPromo = $allBanners->filter(fn ($b) => ($b->placement ?? '') === 'mid_promo')->values();
 
@@ -230,7 +230,15 @@ class LandingPageController extends Controller
             )
         );
 
-        PromoBanner::where('shop_id', $this->shopId())->whereNotIn('id', $keep ?: [0])->delete();
+        // Never delete offer popups here — they are managed under CMS → Offer Popup.
+        PromoBanner::where('shop_id', $this->shopId())
+            ->where(function ($q) {
+                $q->whereNull('placement')
+                    ->orWhere('placement', '')
+                    ->orWhereIn('placement', ['deals', 'hero_side', 'mid_promo']);
+            })
+            ->whereNotIn('id', $keep ?: [0])
+            ->delete();
     }
 
     private function persistBannerRows(array $rows, array $files, string $placement, CmsImageStore $images, ?int $limit = null): array

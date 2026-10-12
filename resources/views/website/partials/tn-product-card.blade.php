@@ -10,6 +10,8 @@
     $isNew = $product->showsAsNew();
     $isCombo = (bool) $product->is_combo;
     $comboItems = $isCombo ? $product->comboItemList() : [];
+    $comboCount = count($comboItems);
+    $comboBlurb = $isCombo ? trim((string) ($product->short_description ?? '')) : '';
     $rating = (float) ($product->rating ?? 0);
     $reviews = (int) ($product->review_count ?? 0);
 
@@ -56,15 +58,36 @@
     <a href="{{ route('website.product', $product) }}" class="tn-product-img" aria-label="{{ $displayName }}">
         <img src="{{ $img }}" alt="{{ $displayName }}" class="bb-fill" loading="lazy" decoding="async">
         @if($isCombo)
-            <span class="tn-product-combo">🎁 Combo{{ count($comboItems) > 1 ? ' · '.count($comboItems).' items' : '' }}</span>
+            <span class="tn-product-combo">
+                Combo
+                @if($comboCount > 0)
+                    <span class="tn-product-combo-count">{{ $comboCount }} {{ \Illuminate\Support\Str::plural('product', $comboCount) }}</span>
+                @endif
+            </span>
         @endif
     </a>
 
     <div class="tn-product-meta">
         <p class="tn-product-cat">{{ $catLabel }}</p>
         <a href="{{ route('website.product', $product) }}" class="tn-product-name">{{ $displayName }}</a>
-        @if($comboItems)
-            <p class="tn-product-combo-items" title="{{ implode(' + ', $comboItems) }}">{{ implode(' + ', $comboItems) }}</p>
+        @if($isCombo)
+            <div class="tn-product-combo-box">
+                @if($comboCount > 0)
+                    <p class="tn-product-combo-label">What’s included ({{ $comboCount }})</p>
+                    <ol class="tn-product-combo-list">
+                        @foreach(array_slice($comboItems, 0, 4) as $item)
+                            <li>{{ $item }}</li>
+                        @endforeach
+                    </ol>
+                    @if($comboCount > 4)
+                        <p class="tn-product-combo-more">+{{ $comboCount - 4 }} more in this set</p>
+                    @endif
+                @elseif($comboBlurb !== '')
+                    <p class="tn-product-combo-blurb">{{ $comboBlurb }}</p>
+                @else
+                    <p class="tn-product-combo-blurb">Multi-item combo set</p>
+                @endif
+            </div>
         @endif
 
         <div class="tn-product-price-row">

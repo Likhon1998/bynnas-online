@@ -697,10 +697,11 @@
                     <span class="text-xs font-normal text-slate-400">Bundle of items sold together at one price</span>
                 </label>
                 <div x-show="combo" x-cloak class="mt-3">
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">What’s in the combo <span class="font-normal text-slate-400">(one item per line)</span></label>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">What’s in the combo <span class="font-normal text-slate-400">(one product per line — shown with count on the storefront)</span></label>
                     <textarea name="combo_items" rows="4"
                               class="block w-full rounded-lg border-slate-200 text-sm"
                               placeholder="Baby feeding bottle 250ml&#10;Soft silicone spoon set&#10;Cotton bib (2 pcs)">{{ old('combo_items', $prefill?->combo_items ?? '') }}</textarea>
+                    <p class="mt-1 text-[11px] text-slate-400">Customers see the product count badge and this item list on cards and the product page.</p>
                     @error('combo_items') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
             </div>

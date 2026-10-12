@@ -50,6 +50,7 @@ use App\Http\Controllers\Cms\DeliverySettingsController;
 use App\Http\Controllers\Cms\CourierServiceController;
 use App\Http\Controllers\Cms\ReviewController as CmsReviewController;
 use App\Http\Controllers\Cms\NavigationController as CmsNavigationController;
+use App\Http\Controllers\Cms\PromoPopupController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -144,6 +145,10 @@ Route::middleware([
         Route::put('/delivery', [DeliverySettingsController::class, 'update'])->name('delivery.update');
         Route::resource('couriers', CourierServiceController::class)->except(['show', 'create', 'edit']);
         Route::resource('slides', HomeSlideController::class)->except(['show']);
+        Route::post('/promo-popups/{banner}/toggle', [PromoPopupController::class, 'toggle'])->name('promo-popups.toggle');
+        Route::resource('promo-popups', PromoPopupController::class)
+            ->except(['show'])
+            ->parameters(['promo-popups' => 'banner']);
         Route::resource('pages', CmsPageController::class)->except(['show']);
         Route::put('/blogs-settings', [CmsBlogController::class, 'updateSettings'])->name('blogs.settings');
         Route::post('/blogs-settings', [CmsBlogController::class, 'updateSettings']);

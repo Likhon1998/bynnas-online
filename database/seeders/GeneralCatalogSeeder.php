@@ -202,6 +202,10 @@ SVG);
                         'is_new_arrival' => (bool) ($family['new'] ?? false),
                         'is_best_seller' => (bool) ($family['best'] ?? false),
                         'is_featured' => (bool) ($family['featured'] ?? false),
+                        'is_combo' => (bool) ($family['combo'] ?? false),
+                        'combo_items' => ! empty($family['combo'])
+                            ? implode("\n", (array) ($family['combo_items'] ?? []))
+                            : null,
                     ]
                 );
 
@@ -392,7 +396,12 @@ SVG);
                 'photos' => ['photo-1587654780291-39c9404d746b'],
                 'summary' => 'Colourful interlocking blocks that spark creativity. Ages 4+.',
                 'description' => "Build anything you imagine with bright, durable blocks.\n\n• Non-toxic ABS plastic\n• Compatible with major block brands\n• Storage box included",
-                'best' => true, 'featured' => true,
+                'best' => true, 'featured' => true, 'combo' => true,
+                'combo_items' => [
+                    'Interlocking building blocks (set size)',
+                    'Idea / build guide card',
+                    'Storage box with lid',
+                ],
             ],
             [
                 'name' => 'Classic Die-cast Toy Car', 'category' => 'Toys & Kids', 'brand' => 'PlayNest',
@@ -419,6 +428,13 @@ SVG);
                 'photos' => ['photo-1515488042361-ee00e0ddd4e4'],
                 'summary' => 'Soft toys, picture book and sensory shapes for early learning.',
                 'description' => "A gift-ready bundle that supports touch, sight and early words.\n\n• Plush animal friends\n• Board picture book\n• Sensory shapes and rattles",
+                'combo' => true,
+                'combo_items' => [
+                    'Plush animal friends (2 pcs)',
+                    'Board picture book',
+                    'Sensory shape set',
+                    'Baby rattles (2 pcs)',
+                ],
             ],
             [
                 'name' => 'Ceramic Coffee Mug', 'category' => 'Home & Kitchen', 'brand' => 'HomeCraft',
@@ -440,7 +456,12 @@ SVG);
                 'photos' => ['photo-1522771739844-6a9f6d5f14af'],
                 'summary' => 'Breathable cotton bedsheet with two matching pillow covers.',
                 'description' => "Soft, breathable cotton for a better night's sleep.\n\n• 200 thread count\n• Includes 2 pillow covers\n• Fade-resistant",
-                'featured' => true,
+                'featured' => true, 'combo' => true,
+                'combo_items' => [
+                    'Cotton bedsheet (selected size)',
+                    'Matching pillow cover',
+                    'Second matching pillow cover',
+                ],
             ],
             [
                 'name' => 'Enamel Cookware Pot', 'category' => 'Home & Kitchen', 'brand' => 'HomeCraft',

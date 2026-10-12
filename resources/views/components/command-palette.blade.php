@@ -35,6 +35,7 @@
         // CMS
         $user->can('manage website') ? ['id' => 'act-cms-landing', 'title' => 'Landing Page', 'subtitle' => 'Store branding & features', 'url' => route('cms.landing.edit'), 'icon' => 'page', 'keywords' => 'cms website landing'] : null,
         $user->can('manage website') ? ['id' => 'act-cms-slides', 'title' => 'Home Slides', 'subtitle' => 'Hero banners', 'url' => route('cms.slides.index'), 'icon' => 'page', 'keywords' => 'cms slides banner'] : null,
+        $user->can('manage website') ? ['id' => 'act-cms-promo-popup', 'title' => 'Offer Popup', 'subtitle' => 'Promotional overlay banner', 'url' => route('cms.promo-popups.index'), 'icon' => 'page', 'keywords' => 'cms offer popup promo advertisement'] : null,
         $user->can('manage website') ? ['id' => 'act-cms-pages', 'title' => 'CMS Pages', 'subtitle' => 'About, policies…', 'url' => route('cms.pages.index'), 'icon' => 'page', 'keywords' => 'cms pages'] : null,
         $user->can('manage website') ? ['id' => 'act-cms-blogs', 'title' => 'Blogs', 'subtitle' => 'Blog posts', 'url' => route('cms.blogs.index'), 'icon' => 'blog', 'keywords' => 'cms blog'] : null,
         $user->can('manage website') ? ['id' => 'act-cms-faqs', 'title' => 'FAQs', 'subtitle' => 'Help content', 'url' => route('cms.faqs.index'), 'icon' => 'page', 'keywords' => 'cms faq help'] : null,

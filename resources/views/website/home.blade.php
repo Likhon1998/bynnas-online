@@ -271,18 +271,19 @@
 <section class="bb-section bb-combos">
     <div class="tn-container">
         <div class="bb-combo-panel">
-            <header class="bb-head">
+            <header class="bb-head bb-combo-head">
                 <span class="bb-head-mark">@include('website.partials.lottie', ['name' => 'gift'])</span>
+                <p class="bb-combo-kicker">Bundle &amp; save</p>
                 <h2 class="bb-head-title">{{ $homeCopy['combo_title'] ?? '' }}</h2>
-                <p class="bb-head-sub">{{ $homeCopy['combo_subtitle'] ?? '' }}</p>
+                <p class="bb-head-sub">{{ $homeCopy['combo_subtitle'] ?: 'Complete sets with every item listed — one price, ready to gift.' }}</p>
             </header>
-            <div class="bb-product-grid bb-product-grid--combo" style="--bb-grid-count: {{ $comboProducts->count() }}">
-                @foreach($comboProducts as $product)
-                    @include('website.partials.tn-product-card', ['product' => $product])
+            <div class="bb-combo-grid" style="--bb-combo-count: {{ min(3, $comboProducts->count()) }}">
+                @foreach($comboProducts->take(3) as $product)
+                    @include('website.partials.tn-combo-card', ['product' => $product])
                 @endforeach
             </div>
             <div class="bb-section-cta">
-                <a href="{{ route('website.shop', ['filter' => 'combo']) }}" class="bb-btn bb-btn--ghost">See all combos</a>
+                <a href="{{ route('website.shop', ['filter' => 'combo']) }}" class="bb-btn bb-btn--ghost">See all combo packs</a>
             </div>
             <span class="bb-combo-deco bb-combo-deco--balloon">@include('website.partials.lottie', ['name' => 'balloon'])</span>
             <span class="bb-combo-deco bb-combo-deco--party">@include('website.partials.lottie', ['name' => 'party'])</span>
@@ -383,7 +384,10 @@
 @endif
 
 {{-- Brands (Products → Brands; target of the "Brands" menu link) --}}
-@php $homeBrands = ($brands ?? collect())->filter(fn ($b) => (int) ($b->products_count ?? 0) > 0)->take(12)->values(); @endphp
+@php
+    $homeBrands = ($brands ?? collect())->filter(fn ($b) => (int) ($b->products_count ?? 0) > 0)->take(16)->values();
+    $brandMarkColors = ['#8b6a4a', '#5a8f6a', '#7c6bb8', '#3d9aa8', '#db6f4a', '#c45a9a', '#3d4f7c', '#4a5568', '#b8860b', '#6b8e6b'];
+@endphp
 @if($homeBrands->isNotEmpty())
 <section class="bb-section bb-brands" id="brands">
     <div class="tn-container">
@@ -392,17 +396,35 @@
             <h2 class="bb-head-title">{{ $homeCopy['brands_title'] ?? '' }} {{ $homeCopy['brands_title_accent'] ?? '' }}</h2>
             <p class="bb-head-sub">{{ $homeCopy['brands_subtitle'] ?? '' }}</p>
         </header>
-        <div class="bb-brand-grid">
-            @foreach($homeBrands as $brand)
-                <a href="{{ route('website.brand', \Illuminate\Support\Str::slug($brand->name)) }}" class="bb-brand-chip">
-                    @if($brand->logo_path)
-                        <img src="{{ public_storage_url($brand->logo_path) }}" alt="{{ $brand->name }}" loading="lazy" decoding="async">
-                    @else
-                        <span class="bb-brand-letter" aria-hidden="true">{{ strtoupper(mb_substr($brand->name, 0, 1)) }}</span>
-                    @endif
-                    <span class="bb-brand-name">{{ $brand->name }}</span>
-                    <span class="bb-brand-count">{{ $brand->products_count }} {{ \Illuminate\Support\Str::plural('item', (int) $brand->products_count) }}</span>
-                </a>
+    </div>
+    <div class="bb-brand-marquee" aria-label="Brands">
+        <div class="bb-brand-track">
+            @foreach([0, 1] as $loopCopy)
+                <div class="bb-brand-set" @if($loopCopy === 1) aria-hidden="true" @endif>
+                    @foreach($homeBrands as $brand)
+                        @php
+                            $words = preg_split('/\s+/', trim((string) $brand->name)) ?: [];
+                            $initials = collect($words)->filter()->take(2)->map(fn ($w) => mb_strtoupper(mb_substr($w, 0, 1)))->implode('');
+                            if ($initials === '') {
+                                $initials = mb_strtoupper(mb_substr((string) $brand->name, 0, 1));
+                            }
+                            $markColor = $brandMarkColors[(int) $brand->id % count($brandMarkColors)];
+                        @endphp
+                        <a href="{{ route('website.brand', \Illuminate\Support\Str::slug($brand->name)) }}"
+                           class="bb-brand-chip"
+                           @if($loopCopy === 1) tabindex="-1" @endif>
+                            @if($brand->logo_path)
+                                <span class="bb-brand-mark bb-brand-mark--logo">
+                                    <img src="{{ public_storage_url($brand->logo_path) }}" alt="" loading="lazy" decoding="async">
+                                </span>
+                            @else
+                                <span class="bb-brand-mark" style="--bb-brand-mark: {{ $markColor }}" aria-hidden="true">{{ $initials }}</span>
+                            @endif
+                            <span class="bb-brand-name">{{ $brand->name }}</span>
+                            <span class="bb-brand-count">{{ $brand->products_count }} {{ \Illuminate\Support\Str::plural('item', (int) $brand->products_count) }}</span>
+                        </a>
+                    @endforeach
+                </div>
             @endforeach
         </div>
     </div>

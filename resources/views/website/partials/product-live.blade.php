@@ -194,15 +194,31 @@
         @endif
 
         @if($product->is_combo)
-            @php $comboItems = $product->comboItemList(); @endphp
+            @php
+                $comboItems = $product->comboItemList();
+                $comboCount = count($comboItems);
+                $comboBlurb = trim((string) ($product->short_description ?? ''));
+            @endphp
             <div class="pd-combo">
-                <p class="pd-combo-title">🎁 Combo pack{{ $comboItems ? ' — what’s inside' : '' }}</p>
-                @if($comboItems)
-                    <ul class="pd-combo-list">
+                <div class="pd-combo-head">
+                    <p class="pd-combo-title">Combo set</p>
+                    <span class="pd-combo-badge">
+                        {{ $comboCount > 0 ? $comboCount.' '.\Illuminate\Support\Str::plural('product', $comboCount) : 'Multi-item pack' }}
+                    </span>
+                </div>
+                @if($comboBlurb !== '')
+                    <p class="pd-combo-blurb">{{ $comboBlurb }}</p>
+                @endif
+                @if($comboCount > 0)
+                    <p class="pd-combo-subtitle">What’s included</p>
+                    <ol class="pd-combo-list">
                         @foreach($comboItems as $item)
-                            <li>{{ $item }}</li>
+                            <li>
+                                <span class="pd-combo-num" aria-hidden="true">{{ $loop->iteration }}</span>
+                                <span>{{ $item }}</span>
+                            </li>
                         @endforeach
-                    </ul>
+                    </ol>
                 @endif
             </div>
         @endif

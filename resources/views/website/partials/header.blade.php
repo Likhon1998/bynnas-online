@@ -197,6 +197,49 @@
                             </div>
                         </div>
 
+                        @if(($brands ?? collect())->isNotEmpty())
+                        <div class="gaget-nav-dropdown"
+                             x-data="navDropdown()"
+                                 :class="{ 'is-open': open }"
+                                 @mouseenter="show()"
+                                 @mouseleave="hide()"
+                                 @focusin="show()"
+                                 @focusout="onFocusOut($event)"
+                                 @keydown.escape.window="close()"
+                                 @click.outside="close()">
+                            <button type="button"
+                                    class="gaget-nav-link gaget-nav-link--dropdown"
+                                    @click="toggle()"
+                                    :aria-expanded="open"
+                                    aria-haspopup="true">
+                                Brands
+                                <svg class="gaget-nav-chevron" :class="{ 'is-open': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div class="gaget-nav-dropdown-menu gaget-nav-dropdown-menu--end" @mouseover="track($event)" @focusin="track($event)" @mouseleave="untrack()">
+                                <span class="gaget-nav-dropdown-glow" aria-hidden="true" :class="{ 'is-on': hl.on, 'is-snap': hl.snap }" :style="`--hl-y:${hl.y}px;--hl-h:${hl.h}px`"></span>
+                                <a href="{{ route('home').'#brands' }}" class="gaget-nav-dropdown-item gaget-nav-dropdown-item--all">
+                                    <span>All brands</span>
+                                    <span class="gaget-nav-dropdown-cta">View all @include('website.partials.nav-dropdown-arrow', ['class' => ''])</span>
+                                </a>
+                                @php $brandTints = [['#f7f3fe', '#6a4bb8'], ['#fdf3ea', '#db6f4a'], ['#eef1e4', '#6f8560'], ['#fff6dc', '#b98a14'], ['#fdeef1', '#c9506d'], ['#eaf4fb', '#3f7fae']]; @endphp
+                                @foreach($brands as $brand)
+                                    @php $tint = $brandTints[$loop->index % count($brandTints)]; @endphp
+                                    <a href="{{ route('website.brand', \Illuminate\Support\Str::slug($brand->name)) }}" class="gaget-nav-dropdown-item" style="--i: {{ min($loop->index + 1, 14) }}">
+                                        <span class="gaget-nav-dropdown-icon" style="--dd-bg: {{ $tint[0] }}; --dd-fg: {{ $tint[1] }};">
+                                            @if($brand->logo_url)
+                                                <img src="{{ $brand->logo_url }}" alt="" loading="lazy" decoding="async">
+                                            @else
+                                                {{ mb_strtoupper(mb_substr($brand->name, 0, 1)) }}
+                                            @endif
+                                        </span>
+                                        <span class="gaget-nav-dropdown-label">{{ $brand->name }}</span>
+                                        @include('website.partials.nav-dropdown-arrow')
+                                    </a>
+                                @endforeach
+                            </div>
+                        </div>
+                        @endif
+
                         @if($hasAboutPage)
                             <a href="{{ route('website.page', 'about-us') }}" class="gaget-nav-link {{ request()->is('page/about-us') ? 'is-active' : '' }}">About Us</a>
                         @endif
@@ -592,6 +635,27 @@
                         @foreach(($allCategories ?? []) as $cat)
                             <a href="{{ route('website.category', $cat->slug) }}" class="gaget-mobile-drawer-link gaget-mobile-drawer-link--sub" @click="mobileOpen = false">
                                 <span>{{ $cat->name }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            @if(($brands ?? collect())->isNotEmpty())
+                <div class="gaget-mobile-accordion">
+                    <button type="button"
+                            class="gaget-mobile-accordion-btn"
+                            @click="mobileBrandsOpen = !mobileBrandsOpen; if (mobileBrandsOpen) mobileCatsOpen = false"
+                            :aria-expanded="mobileBrandsOpen"
+                            :class="{ 'is-open': mobileBrandsOpen }">
+                        <span>Brands</span>
+                        <svg class="gaget-mobile-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div class="gaget-mobile-accordion-panel" x-show="mobileBrandsOpen" x-cloak x-transition.opacity.duration.150ms>
+                        <a href="{{ route('home').'#brands' }}" class="gaget-mobile-drawer-link gaget-mobile-drawer-link--sub" @click="mobileOpen = false">All brands</a>
+                        @foreach($brands as $brand)
+                            <a href="{{ route('website.brand', \Illuminate\Support\Str::slug($brand->name)) }}" class="gaget-mobile-drawer-link gaget-mobile-drawer-link--sub" @click="mobileOpen = false">
+                                <span>{{ $brand->name }}</span>
                             </a>
                         @endforeach
                     </div>

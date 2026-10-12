@@ -240,12 +240,12 @@ class WebsiteService
 
         $comboProducts = $this->dedupeVariantCollection(
             $this->catalogQuery($shopId)
-                ->with(['category', 'brand'])
+                ->with(['category', 'brand', 'variantValues.attribute', 'variantValues.attributeValue'])
                 ->combos()
                 ->latest('id')
                 ->take(24)
                 ->get(),
-            8
+            6
         );
 
         // Trending = best sellers (same CMS product flags) — keep one source of truth
@@ -302,6 +302,7 @@ class WebsiteService
                 ->orderBy('id')
                 ->take(12)
                 ->get(),
+            'promoPopup' => $this->activePromoPopup($shopId),
             'bestSellers' => $bestSellers,
             'featuredProducts' => $featuredProducts,
             'flashSaleProducts' => $flashSaleProducts,
@@ -331,6 +332,7 @@ class WebsiteService
             'promoBanners' => collect(),
             'heroSideCards' => collect(),
             'midPromoBanners' => collect(),
+            'promoPopup' => null,
             'bestSellers' => collect(),
             'featuredProducts' => collect(),
             'flashSaleProducts' => collect(),
@@ -346,6 +348,24 @@ class WebsiteService
             'latestBlogs' => collect(),
             'deliveryConfig' => app(\App\Services\DeliveryChargeService::class)->publicConfig(),
         ];
+    }
+
+    /** Active storefront offer popup (image overlay), or null when none. */
+    public function activePromoPopup(?int $shopId = null): ?PromoBanner
+    {
+        $shopId = $shopId ?: $this->shop()?->id;
+        if (! $shopId) {
+            return null;
+        }
+
+        return PromoBanner::where('shop_id', $shopId)
+            ->where('placement', 'popup')
+            ->where('is_active', true)
+            ->whereNotNull('image_path')
+            ->where('image_path', '!=', '')
+            ->orderBy('sort_order')
+            ->orderByDesc('id')
+            ->first();
     }
 
     public function publishedPage(string $slug): ?CmsPage

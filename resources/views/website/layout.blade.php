@@ -1541,6 +1541,7 @@ document.addEventListener('click', function (event) {
     });
 })();
 </script>
+@include('website.partials.promo-popup')
 @stack('scripts')
 </body>
 </html>
